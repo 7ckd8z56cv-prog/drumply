@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drumply</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Special+Elite&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#111;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    height:100vh;overflow:hidden;
+    font-family:'Special Elite',cursive;
+  }
+  #gameWrapper { position:relative;width:360px;height:600px; }
+  canvas { display:block;border:3px solid #cc0000;
+    box-shadow:0 0 30px #cc000066,0 0 80px #cc000022; }
+  #ui { position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none; }
+  #score {
+    position:absolute;top:10px;width:100%;text-align:center;color:#fff;
+    font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;
+    text-shadow:1px 1px 4px #000,2px 2px #cc0000;
+  }
+  #timer {
+    position:absolute;top:34px;width:100%;text-align:center;color:#ffdd00;
+    font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:2px;
+    text-shadow:1px 1px 3px #000;
+  }
+  /* Full overlay panels */
+  .overlay {
+    position:absolute;top:0;left:0;width:100%;height:100%;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;cursor:pointer;pointer-events:all;
+  }
+  .overlay.hidden { display:none !important; }
+
+/* TV News card - newspaper spin effect */
+#newsOverlay { background:rgba(0,0,0,0.88); }
+#newsCard {
+width:300px; background:#fff; border:4px solid #cc0000;
+padding:16px; box-shadow:0 0 50px rgba(0,0,0,0.8);
+transform-origin: center center;
+transform: rotate(540deg) scale(0.01);
+opacity:0;
+}
+@keyframes newspaperIn {
+0%   { transform: rotate(540deg) scale(0.01); opacity:0; }
+60%  { transform: rotate(15deg)  scale(1.08); opacity:1; }
+80%  { transform: rotate(-8deg)  scale(0.97); opacity:1; }
+100% { transform: rotate(0deg)   scale(1);    opacity:1; }
+}
+@keyframes newspaperOut {
+0%   { transform: rotate(0deg)    scale(1);    opacity:1; }
+100% { transform: rotate(-540deg) scale(0.01); opacity:0; }
+}
+#newsCard.spin-in  { animation: newspaperIn  0.85s cubic-bezier(0.2,0.8,0.3,1.0) forwards; }
+#newsCard.spin-out { animation: newspaperOut 0.45s ease-in forwards; }
+.nBreaking {
+background:#cc0000;color:#fff;
+font-family:‘Bebas Neue’,sans-serif;font-size:12px;
+padding:2px 10px;display:inline-block;margin-bottom:8px;letter-spacing:2px;
+}
+.nHeadline {
+font-family:‘Bebas Neue’,sans-serif;font-size:19px;
+color:#cc0000;border-bottom:2px solid #eee;
+padding-bottom:5px;margin-bottom:8px;line-height:1.2;
+}
+.nBody { font-size:12px;color:#111;line-height:1.6; }
+.nSub { font-size:10px;color:#888;margin-top:7px;font-style:italic; }
+.nLevelBadge {
+font-family:‘Bebas Neue’,sans-serif;font-size:16px;
+color:#ffdd00;letter-spacing:3px;text-align:center;
+}
+.nCta {
+color:#ffdd00;font-family:‘Bebas Neue’,sans-serif;font-size:14px;
+letter-spacing:2px;text-shadow:0 0 8px #ffdd00;
+animation:blink 1s infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* Golf UI */
+#golfUI {
+position:absolute;bottom:18px;left:0;width:100%;
+display:none;flex-direction:column;align-items:center;gap:8px;
+pointer-events:none;
+}
+#golfMsg {
+color:#fff;font-family:‘Bebas Neue’,sans-serif;font-size:14px;
+text-align:center;text-shadow:1px 1px 3px #000;letter-spacing:1px;min-height:18px;
+}
+#golfBtn {
+background:rgba(0,0,0,0.72);border:2px solid #ffdd00;
+color:#ffdd00;font-family:‘Bebas Neue’,sans-serif;font-size:15px;
+letter-spacing:2px;padding:10px 26px;cursor:pointer;
+pointer-events:all;border-radius:4px;
+text-shadow:0 0 8px #ffdd00;animation:blink 1.2s infinite;
+}
+#langBar {
+display:flex; gap:6px; margin-bottom:6px; justify-content:center;
+}
+.langBtn {
+background:rgba(0,0,0,0.6); border:2px solid #555;
+color:#aaa; font-family:‘Bebas Neue’,sans-serif; font-size:13px;
+padding:4px 10px; cursor:pointer; border-radius:4px; letter-spacing:1px;
+transition: all 0.2s;
+}
+.langBtn.active {
+border-color:#FF7518; color:#FF7518; text-shadow:0 0 6px #FF7518;
+}
+#titleLabel {
+color:#cc0000;font-family:‘Bebas Neue’,sans-serif;font-size:11px;
+letter-spacing:4px;margin-top:8px;text-shadow:0 0 6px #cc000088;
+}
+</style>
+
+</head>
+<body>
+<div id="gameWrapper">
+  <canvas id="c" width="360" height="600"></canvas>
+  <div id="ui">
+    <div id="score">SCORE: 0</div>
+    <div id="timer"></div>
+
+```
+<div class="overlay" id="introPanel" style="background:#0a0a0a;">
+
+  <!-- Newspaper header -->
+  <div style="width:300px;border-top:4px solid #FF7518;border-bottom:2px solid #FF7518;padding:6px 0;margin-bottom:10px;text-align:center;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:#FF7518;letter-spacing:4px;text-shadow:0 0 15px #FF751855;" class="drumplyTitle">DRUMPLY FLIES!</div>
+    <div style="font-family:'Special Elite',cursive;font-size:9px;color:#666;letter-spacing:2px;" id="titleSub2">POLITICAL SATIRE</div>
+  </div>
+
+  <!-- Highscores -->
+  <div id="highscoreDisplay" style="font-family:'Bebas Neue',sans-serif;font-size:11px;color:rgba(255,220,50,0.7);letter-spacing:1px;text-align:center;min-height:24px;margin-bottom:6px;"></div>
+
+  <!-- Story card -->
+  <div style="width:290px;background:#111;border:1px solid #333;padding:14px 16px;font-size:12px;line-height:1.8;color:#ccc;font-family:'Special Elite',cursive;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:13px;color:#FF7518;letter-spacing:2px;margin-bottom:8px;border-bottom:1px solid #333;padding-bottom:4px;">📰 BREAKING NEWS</div>
+    <div class="introBodyText">You <b style="color:#fff;">(Drumply)</b> made it. Elected president, you quickly turned autocrat.<br><br>Media, parliament and courts have been stripped of power.<br><br><span style="color:#aaa;font-style:italic;">But now a scandal threatens everything – your ties to billionaire <b style="color:#fff;">Approck</b>...</span></div>
+  </div>
+
+  <div class="introCta" style="color:#ffdd00;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:3px;animation:blink 1s infinite;margin-top:12px;">▶ PRESS TO START</div>
+</div>
+
+<!-- TV News overlay (scandal before each level) -->
+<div class="overlay hidden" id="newsOverlay">
+  <div id="newsCard">
+    <div class="nBreaking" id="nBreaking">BREAKING NEWS</div>
+    <div class="nHeadline" id="nHeadline">–</div>
+    <div class="nBody" id="nBody">–</div>
+    <div class="nSub" id="nSub"></div>
+  </div>
+  <div class="nLevelBadge" id="nLevelBadge"></div>
+  <div id="nMission" style="
+    background:#FF7518; color:#fff;
+    font-family:'Bebas Neue',sans-serif; font-size:13px;
+    letter-spacing:1px; padding:7px 12px; width:100%;
+    line-height:1.4; display:none; margin-top:4px;
+  "></div>
+  <div class="nCta">TIPPEN ZUM STARTEN</div>
+</div>
+
+<!-- Golf UI - side by side: continue left, golf right -->
+<div id="golfUI" style="
+  position:absolute; bottom:85px; left:0; right:0;
+  display:none; flex-direction:row; align-items:flex-end;
+  justify-content:space-between; padding:0 10px; gap:8px;
+  pointer-events:none;
+">
+  <!-- LEFT: Continue button -->
+  <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;">
+    <div id="golfMsg" style="
+      color:#fff; font-family:'Bebas Neue',sans-serif; font-size:12px;
+      text-shadow:1px 1px 3px #000; letter-spacing:1px; min-height:16px;
+    "></div>
+    <button id="golfContinueBtn" style="
+      background:rgba(0,0,0,0.75);border:2px solid #ff4444;
+      color:#ff4444;font-family:'Bebas Neue',sans-serif;font-size:12px;
+      letter-spacing:1px;padding:9px 12px;cursor:pointer;
+      pointer-events:all;border-radius:5px;
+      text-shadow:0 0 8px #ff4444;animation:blink 1s infinite;
+      -webkit-user-select:none;user-select:none;
+    ">▶ NAECHSTES<br>LEVEL</button>
+  </div>
+  <!-- RIGHT: Golf controls -->
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+    <div style="display:flex;align-items:center;gap:5px;">
+      <div style="color:#ffdd00;font-family:'Bebas Neue',sans-serif;font-size:10px;text-shadow:1px 1px 2px #000" id="kraftLabel">POWER</div>
+      <div style="width:70px;height:10px;background:rgba(0,0,0,0.5);border:1px solid #ffdd00;border-radius:5px;overflow:hidden;">
+        <div id="powerBar" style="height:100%;width:0%;background:linear-gradient(90deg,#00cc44,#ffdd00,#ff4400);border-radius:5px;"></div>
+      </div>
+    </div>
+    <button id="golfBtn" style="
+      background:rgba(0,0,0,0.75);border:2px solid #ffdd00;
+      color:#ffdd00;font-family:'Bebas Neue',sans-serif;font-size:12px;
+      letter-spacing:1px;padding:9px 12px;cursor:pointer;
+      pointer-events:all;border-radius:6px;
+      text-shadow:0 0 8px #ffdd00;animation:blink 1.2s infinite;
+      -webkit-user-select:none;user-select:none;
+    ">⛳ HALTEN =<br>MEHR KRAFT</button>
+  </div>
+</div>
+
+<!-- Skandal abgewendet overlay (after 45s, auto-transitions to golf) -->
+<div class="overlay hidden" id="skandalPanel" style="background:rgba(0,20,0,0.9);">
+  <div id="skandalTitle" style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:#00cc44;text-shadow:0 0 20px #00cc44;text-align:center;letter-spacing:4px;line-height:1.2">✅ SCANDAL AVERTED!</div>
+  <div id="counterCard" style="background:#fff;color:#111;padding:12px 16px;width:290px;border-left:6px solid #00aa33;font-size:12px;line-height:1.5">
+    <div id="counterHeadline" style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:#007722;margin-bottom:5px"></div>
+    <div id="counterBody"></div>
+    <div id="counterSub" style="font-size:10px;color:#888;margin-top:6px;font-style:italic"></div>
+  </div>
+  <div id="skandalSub" style="color:#ffdd00;font-size:11px;font-family:'Bebas Neue',sans-serif;letter-spacing:2px">Drumply relaxes on the golf course...</div>
+  <button id="skandalContinueBtn" style="background:rgba(0,0,0,0.6);border:2px solid #00cc44;color:#00cc44;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:2px;padding:10px 24px;cursor:pointer;border-radius:5px;text-shadow:0 0 8px #00cc44;animation:blink 1s infinite;pointer-events:all;-webkit-user-select:none;user-select:none;">▶ CONTINUE</button>
+</div>
+
+<!-- Game Over -->
+<div class="overlay hidden" id="gameoverPanel" style="background:rgba(0,0,0,0.87);">
+  <div id="goTitle" style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:#ff2200;text-shadow:0 0 20px #ff2200;text-align:center;letter-spacing:3px;line-height:1.2">BUSTED!</div>
+  <div style="background:#fff;color:#111;padding:12px 16px;width:290px;border-left:6px solid #cc0000;font-size:12px;line-height:1.6">
+    <div id="goHeadline" style="font-family:'Bebas Neue',sans-serif;font-size:17px;color:#cc0000;margin-bottom:6px">THE APPROCK SCANDAL CAUGHT UP WITH YOU</div>
+    <span id="goBodyText">You must resign and retreat to your beach club.</span><br><br>
+    <span id="goScore" style="color:#888;font-size:11px"></span>
+  </div>
+  <div class="nCta">TAP FOR NEW GAME</div>
+</div>
+```
+
+  </div>
+</div>
+<div id="langBar">
+  <button class="langBtn active" onclick="setLang('en')">🇬🇧 EN</button>
+  <button class="langBtn" onclick="setLang('de')">🇩🇪 DE</button>
+  <button class="langBtn" onclick="setLang('fr')">🇫🇷 FR</button>
+</div>
+<div id="titleLabel">— POLITICAL SATIRE —</div>
+
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const W=canvas.width, H=canvas.height;
+
+const scorEl=document.getElementById('score');
+const timerEl=document.getElementById('timer');
+const newsOverlay=document.getElementById('newsOverlay');
+const newsCard=document.getElementById('newsCard');
+const nBreaking=document.getElementById('nBreaking');
+const nHeadline=document.getElementById('nHeadline');
+const nBody=document.getElementById('nBody');
+const nSub=document.getElementById('nSub');
+const nLevelBadge=document.getElementById('nLevelBadge');
+const nMission=document.getElementById('nMission');
+const skandalPanel=document.getElementById('skandalPanel');
+const gameoverPanel=document.getElementById('gameoverPanel');
+const golfUI=document.getElementById('golfUI');
+const golfMsg=document.getElementById('golfMsg');
+const introPanel=document.getElementById('introPanel');
+
+// ── LEVEL DATA – shuffled pools ────────────────────────────────────────────
+// ── TRANSLATIONS ───────────────────────────────────────────────────────────
+var lang = 'en';
+
+var T = {
+  en: {
+    title: 'DRUMPLY FLIES!',
+    titleSub: '— POLITICAL SATIRE —',
+    introPressStart: '▶ PRESS TO START',
+    introBody: 'You <b style="color:#fff;">(Drumply)</b> made it. Elected president, you quickly turned autocrat.<br><br>Media, parliament and courts have been stripped of power.<br><br><span style="color:#aaa;font-style:italic;">But now a scandal threatens everything – your ties to billionaire <b style="color:#fff;">Approck</b>...</span>',
+    scoreLabel: 'SCORE: ',
+    hsPersonal: '🏆 BEST: ',
+    hsGlobal: '🌍 WORLD: ',
+    skandalTitle: '✅ SCANDAL AVERTED!',
+    skandalSub: 'Drumply takes a break on the golf course...',
+    skandalBtn: '▶ CONTINUE',
+    gameoverTitle: 'BUSTED!',
+    gameoverHeadline: 'THE APPROCK SCANDAL CAUGHT UP WITH YOU',
+    gameoverBody: 'You must resign and retreat to your beach club.',
+    gameoverBtn: 'TAP FOR NEW GAME',
+    golfRelax: 'Drumply relaxes on the golf course...',
+    golfSwing: 'SWING!',
+    golfTooFar: ['WAY TOO FAR!','INSANE!','INTO ANOTHER DIMENSION!','Oops... way gone!','TOO STRONG!!'],
+    golfShort: 'Erm... was that even a swing?',
+    golfMiss: ['Just missed!','So close!','Unbelievable!','Noooo!','Again?!','Seriously?!'],
+    golfAgain: 'Try again!',
+    golfContinue: '▶ NEXT LEVEL',
+    golfPower: 'POWER',
+    golfHold: '⛳ HOLD =<br>MORE POWER',
+    golfRelease: '⛳ RELEASE!',
+    golfRoll: 'A gentle roll... so close!',
+    totalScore: 'Total: ',
+    scorePoints: ' pts',
+    allLevelsDone: 'All levels completed!',
+    capLabel: 'GOAL',
+    golfSceneTitle: 'DRUMPLY RELAXES ON THE GOLF COURSE',
+    golfNewsSoon: 'New report in ',
+    golfNewsNow: 'BREAKING NEWS INCOMING...',
+    newsStart: 'TAP TO START',
+    mission: 'MISSION: Drumply needs the red cap – only then can he plan his next distraction. He sets out.',
+    capHint: 'CAP >',
+    clipHeadlines: ['MEDIA','NEWSPAPER','PRESS','SCANDAL!','BREAKING','EXCLUSIVE'],
+    pipeLabels: ['PARLIAMENT','COURTS','PRESS'],
+    signSlogans: ['NO!','OUT!','STOP','WE SEE YOU','APPROCK?','LIAR','NO DICTATORSHIP','DEMOCRACY'],
+    scandals: [
+      { breaking:'⚡ SCANDAL', headline:'SUPPORTERS DOUBT DRUMPLY', body:'Even die-hard supporters grow uneasy. Internal polls show rising skepticism – the connection to Approck can no longer be ignored.', sub:'Sources: The mood is turning.' },
+      { breaking:'🚨 NEW REVELATION', headline:'OLD VIDEOS WITH APPROCK SURFACE', body:'Archive footage shows Drumply and Approck laughing together at a luxury party. The images go viral within minutes.', sub:'Drumply: "I don\'t know this man." – Video proves otherwise.' },
+      { breaking:'📺 LATE NIGHT MOCKS', headline:'TV HOST DISMANTLES DRUMPLY LIVE', body:'Host Jay Fallowen dedicates his entire monologue to the Approck affair. The clip reaches 50 million views in 6 hours.', sub:'Drumply: "Fake news!" – Ratings break records.' },
+      { breaking:'💀 SCANDAL ESCALATES', headline:'DRUMPLY TRIES TO TALK IT DOWN – MAKES IT WORSE', body:'Drumply\'s frantic denials draw even more attention. Journalists dig deeper. New details emerge by the hour.', sub:'Experts: "He should have just stayed quiet."' },
+      { breaking:'🎬 DOCUMENTARY', headline:'NATIONAL DOC ABOUT APPROCK RELEASED', body:'A handful of independent media outlets have released a nationwide documentary about Approck. His connection to Drumply is the central theme.', sub:'Streaming numbers break all records.' },
+      { breaking:'✈️ TRAVEL SCANDAL', headline:'DRUMPLY\'S ASSOCIATES TRAVELLED WITH APPROCK', body:'New evidence shows: close allies of Drumply travelled together with Approck on private jets. The scandal heats up again.', sub:'White House refuses to comment.' },
+      { breaking:'👗 FIRST LADY SPEAKS', headline:'DRUMPLY\'S WIFE: I HAD NOTHING TO DO WITH APPROCK!', body:'In a surprise press conference, Drumply\'s wife emphatically stated she had no connection to Approck whatsoever. The emphasis only makes it more suspicious.', sub:'Observers: "Why does she stress it so much?"' },
+      { breaking:'✉️ LEAKED LETTER', headline:'SECRET LETTER FROM DRUMPLY TO APPROCK PUBLISHED', body:'An alleged handwritten letter from Drumply to Approck has been leaked. Drumply denies everything – but the public grows increasingly suspicious as the details stack up.', sub:'Handwriting experts: "The similarities are striking."' },
+    ],
+    counters: [
+      { headline:'DRUMPLY THREATENS FINANCE CHIEF', body:'Drumply threatens to fire the head of the financial authority. Markets react nervously – the economic crisis is a perfect distraction.', sub:'Analysts: "Politically motivated chaos."' },
+      { headline:'BILLIONAIRES SHIELD DRUMPLY', body:'The country\'s wealthiest men publicly declare their support for the president. Critics call it organized hush money.', sub:'"He who pays, commands." – Opposition outraged.' },
+      { headline:'DRUMPLY THREATENS TO SEIZE ALLY\'S ISLAND', body:'Drumply hints at taking control of an allied nation\'s island. International outrage – Approck temporarily forgotten.', sub:'NATO partners demand immediate explanation.' },
+      { headline:'DRUMPLY KIDNAPS FOREIGN PRESIDENT', body:'Special forces bring a friendly nation\'s president to the White House. Worldwide outrage – nobody talks about Approck anymore.', sub:'UN Security Council calls emergency meeting.' },
+      { headline:'DRUMPLY STARTS A WAR FAR AWAY', body:'Drumply orders military action in a distant region. International media report around the clock. Approck? Buried under war headlines.', sub:'Drumply: "We\'re protecting freedom."' },
+      { headline:'DRUMPLY TARGETS NON-ORANGE PEOPLE', body:'Drumply deploys armed agents to arrest and deport non-orange people. Massive outrage – Approck no longer the topic.', sub:'Civil rights groups: "This is an attack on the constitution."' },
+      { headline:'DRUMPLY LAUNCHES OWN CRYPTOCURRENCY', body:'After a strong start, Drumply-Coin crashes massively. Investors lose everything – Drumply gets richer. Any press beats Approck press.', sub:'Finance experts: "The biggest pump-and-dump ever."' },
+      { headline:'DRUMPLY DEMOLISHES PART OF THE RESIDENCE', body:'Drumply has parts of the presidential residence torn down for a pompous prestige building. Many outraged over costs. Approck forgotten.', sub:'Bill: 4 billion. Taxpayers pay.' },
+      { headline:'DRUMPLY FIRES MINISTERS AND TRASH-TALKS THEM', body:'Drumply publicly fires several ministers and mocks them in press conferences. The chaos dominates headlines – his own scandals and the Approck affair are completely overshadowed.', sub:'Former minister: "He throws everyone under the bus to save himself."' },
+    ],
+  },
+  de: {
+    title: 'DRUMPLY FLIEGT!',
+    titleSub: '— POLITISCHE SATIRE —',
+    introPressStart: '▶ PRESS TO START',
+    introBody: 'Du <b style="color:#fff;">(Drumply)</b> hast es geschafft. Zum Praesidenten gewaehlt, hast du dich schnell zum Autokraten hochgearbeitet.<br><br>Medien, Parlament und Gerichte wurden in ihren Rechten eingeschraenkt.<br><br><span style="color:#aaa;font-style:italic;">Doch nun bedroht dich ein Skandal – deine Verbindung zum Milliardaer <b style="color:#fff;">Approck</b>...</span>',
+    scoreLabel: 'PUNKTE: ',
+    hsPersonal: '🏆 BESTLEISTUNG: ',
+    hsGlobal: '🌍 WELTREKORD: ',
+    skandalTitle: '✅ SKANDAL ABGEWENDET!',
+    skandalSub: 'Drumply goennt sich eine Pause auf dem Golfplatz...',
+    skandalBtn: '▶ WEITER SPIELEN',
+    gameoverTitle: 'ERWISCHT!',
+    gameoverHeadline: 'DER APPROCK-SKANDAL HAT DICH EINGEHOLT',
+    gameoverBody: 'Du musst zuruecktreten und ziehst dich in deinen Beachclub zurueck.',
+    gameoverBtn: 'TIPPEN FUER NEUES SPIEL',
+    golfRelax: 'Drumply entspannt auf dem Golfplatz...',
+    golfSwing: 'SCHWUNG!',
+    golfTooFar: ['VIEL ZU WEIT!','WAHNSINN!','IN EINE ANDERE WELT!','Oops... weit weg!','ZU STARK!!'],
+    golfShort: 'Aehm... war das ein Schlag?',
+    golfMiss: ['Knapp daneben!','Fast!','Unglaublich!','Noooo!','Schon wieder!','Echt jetzt?!'],
+    golfAgain: 'Noch ein Versuch!',
+    golfContinue: '▶ NAECHSTES LEVEL',
+    golfPower: 'KRAFT',
+    golfHold: '⛳ HALTEN =<br>MEHR KRAFT',
+    golfRelease: '⛳ LOSLASSEN!',
+    golfRoll: 'Ein sanftes Rollen... knapp!',
+    totalScore: 'Gesamt: ',
+    scorePoints: ' Punkte',
+    allLevelsDone: 'Alle Level bestanden!',
+    capLabel: 'ZIEL',
+    golfSceneTitle: 'DRUMPLY ENTSPANNT AUF DEM GOLFPLATZ',
+    golfNewsSoon: 'Neue Meldung in ',
+    golfNewsNow: 'BREAKING NEWS INCOMING...',
+    newsStart: 'TIPPEN ZUM STARTEN',
+    mission: 'MISSION: Drumply braucht die rote Cap – nur mit ihr kann er sein naechstes Ablenkungsmanöver starten. Er zieht los.',
+    capHint: 'CAP >',
+    clipHeadlines: ['MEDIEN','ZEITUNG','PRESSE','SKANDAL!','BREAKING','EXKLUSIV'],
+    pipeLabels: ['PARLAMENT','GERICHTE','PRESSE'],
+    signSlogans: ['NEIN!','WEG!','STOPP','WIR SEHEN DICH','APPROCK?','LUEGNER','KEINE DIKTATUR','DEMOKRATIE'],
+    scandals: [
+      { breaking:'⚡ SKANDAL', headline:'ANHAENGER ZWEIFELN AN DRUMPLY', body:'Selbst hartnaeckige Anhaenger werden unruhig. Interne Umfragen zeigen wachsende Skepsis – die Verbindung zu Approck laesst sich nicht mehr ignorieren.', sub:'Quellen: Die Stimmung kippt.' },
+      { breaking:'🚨 NEUE ENTHUELLUNG', headline:'ALTE VIDEOS MIT APPROCK AUFGETAUCHT', body:'Archivaufnahmen zeigen Drumply und Approck beim gemeinsamen Lachen auf einer Luxusparty. Die Bilder verbreiten sich binnen Minuten viral.', sub:'Drumply: Ich kenne diesen Mann nicht. – Video beweist das Gegenteil.' },
+      { breaking:'📺 LATE NIGHT SPOTTET', headline:'TV-HOST DEMONTIERT DRUMPLY LIVE', body:'Moderator Jay Fallowen widmet seinen gesamten Monolog der Approck-Affaere. Der Clip erreicht 50 Millionen Aufrufe in 6 Stunden.', sub:'Drumply: Fake News! – Einschaltquoten brechen Rekord.' },
+      { breaking:'💀 SKANDAL ESKALIERT', headline:'DRUMPLY VERSUCHT ALLES RUNTERZUREDEN – ES WIRD SCHLIMMER', body:'Die hektischen Dementis von Drumply fuehren zu noch mehr Aufmerksamkeit. Journalisten graben tiefer. Neue Details erscheinen stuendlich.', sub:'Experten: Er haette einfach schweigen sollen.' },
+      { breaking:'🎬 DOKU', headline:'NATIONALE DOKUMENTATION UEBER APPROCK ERSCHIENEN', body:'Einige wenige unabhaengige Medien haben eine landesweite Dokumentation ueber Approck veroeffentlicht. Die Verbindung zu Drumply ist das zentrale Thema.', sub:'Streaming-Zahlen brechen alle Rekorde.' },
+      { breaking:'✈️ REISESKANDAL', headline:'DRUMPLYS BEKANNTE MIT APPROCK GEREIST', body:'Neue Belege zeigen: Enge Vertraute von Drumply sind gemeinsam mit Approck auf Privatjets gereist. Der Skandal kocht wieder hoch.', sub:'Weisses Haus verweigert Stellungnahme.' },
+      { breaking:'👗 ERSTE FRAU SPRICHT', headline:'DRUMPLYS FRAU: ICH HATTE NICHTS MIT APPROCK ZU TUN!', body:'In einer ueberraschenden Pressekonferenz betonte Drumplys Frau ausdruecklich keinerlei Verbindung zu Approck zu haben. Die Betonung macht es nur verdaechtiger.', sub:'Beobachter: Warum betont sie das so stark?' },
+      { breaking:'✉️ GELEAKTER BRIEF', headline:'GEHEIMER BRIEF VON DRUMPLY AN APPROCK VEROEFFENTLICHT', body:'Ein angeblich handgeschriebener Brief von Drumply an Approck wurde geleakt. Drumply bestreitet alles – doch die Leute werden zusehends misstrauisch je mehr Details auftauchen.', sub:'Schriftgutachter: Die Aehnlichkeiten sind verblüffend.' },
+    ],
+    counters: [
+      { headline:'DRUMPLY DROHT FINANZBEHÖRDE', body:'Drumply droht den Chef der Finanzbehörde zu entlassen. Boersen reagieren nervos – die Wirtschaftskrise lenkt komplett ab.', sub:'Marktanalysten: Politisch motiviertes Chaos.' },
+      { headline:'ANDERE MILLIARDAERE SCHUETZEN DRUMPLY', body:'Die reichsten Maenner des Landes erklaeren oeffentlich ihre Unterstuetzung. Kritiker sprechen von organisiertem Schweigekauf.', sub:'Wer zahlt schafft an. – Opposition entsetzt.' },
+      { headline:'DRUMPLY DROHT VERBÜNDETEM DIE INSEL WEGZUNEHMEN', body:'Drumply deutet an die Kontrolle ueber eine Insel eines Verbündeten zu uebernehmen. Internationale Empoerung – Approck vorerst vergessen.', sub:'NATO-Partner fordern sofortige Erklaerung.' },
+      { headline:'DRUMPLY ENTFUEHRT AUSLAENDISCHEN PRAESIDENTEN', body:'Sondereinsatzkraefte bringen den Praesidenten eines befreundeten Landes ins Weisse Haus. Weltweite Empoerung – niemand spricht mehr ueber Approck.', sub:'UN-Sicherheitsrat tritt zu Notfallsitzung zusammen.' },
+      { headline:'DRUMPLY FAENGT WEIT WEG EINEN KRIEG AN', body:'Drumply ordnet Militaereinsatz in einer weit entfernten Region an. Internationale Medien berichten rund um die Uhr. Approck? Begraben.', sub:'Drumply: Wir beschuetzen die Freiheit.' },
+      { headline:'HETZE GEGEN NICHT-ORANGE MENSCHEN', body:'Drumply laesst bewaffnete Angestellte nicht-orange Menschen festnehmen und abschieben. Riesige Empoerung – Approck ist kein Thema mehr.', sub:'Buergerrechtler: Das ist ein Angriff auf die Verfassung.' },
+      { headline:'DRUMPLY BRINGT EIGENE KRYPTOWAEHRUNG RAUS', body:'Nach einem starken Start stuerzt der Drumply-Coin massiv ab. Anleger verlieren alles – Drumply wird reicher. Jede Presse ist besser als Approck-Presse.', sub:'Finanzexperten: Der groesste Pump-and-Dump aller Zeiten.' },
+      { headline:'DRUMPLY REISST TEIL DES PRAESIDENTENSITZES AB', body:'Drumply laesst Teile des Praesidentenwohnsitzes abreissen fuer einen pompösen Prestigebau. Viele sind empoert ueber die Kosten. Approck kein Thema.', sub:'Kostenrechnung: 4 Milliarden. Steuerzahler zahlen.' },
+      { headline:'DRUMPLY ENTLAESST MINISTER UND LAESTERT UEBER SIE', body:'Drumply entlaesst mehrere Minister oeffentlich und verspottet sie in Pressekonferenzen. Das Chaos dominiert die Schlagzeilen – seine eigenen Skandale und die Approck-Affaere sind voellig in Vergessenheit geraten.', sub:'Ex-Minister: Er opfert jeden um sich selbst zu schuetzen.' },
+    ],
+  },
+  fr: {
+    title: 'DRUMPLY VOLE!',
+    titleSub: '— SATIRE POLITIQUE —',
+    introPressStart: '▶ APPUYER POUR COMMENCER',
+    introBody: 'Vous <b style="color:#fff;">(Drumply)</b> avez reussi. Elu president, vous etes rapidement devenu autocrate.<br><br>Medias, parlement et tribunaux ont ete prives de leurs droits.<br><br><span style="color:#aaa;font-style:italic;">Mais un scandale vous menace 2013 votre lien avec le milliardaire <b style="color:#fff;">Approck</b>...</span>',
+    scoreLabel: 'SCORE: ',
+    hsPersonal: '🏆 MEILLEUR: ',
+    hsGlobal: '🌍 MONDIAL: ',
+    skandalTitle: '✅ SCANDALE ECARTE!',
+    skandalSub: 'Drumply se repose sur le terrain de golf...',
+    skandalBtn: '▶ CONTINUER',
+    gameoverTitle: 'PRIS!',
+    gameoverHeadline: 'LE SCANDALE APPROCK VOUS A RATTRAPE',
+    gameoverBody: 'Vous devez demissionner et vous retirer dans votre beach club.',
+    gameoverBtn: 'APPUYER POUR REJOUER',
+    golfRelax: 'Drumply se detend sur le terrain de golf...',
+    golfSwing: 'SWING!',
+    golfTooFar: ['BEAUCOUP TROP LOIN!','INCROYABLE!','DANS UNE AUTRE DIMENSION!','Oups... trop fort!','TROP PUISSANT!!'],
+    golfShort: 'Euh... c\'etait un coup?',
+    golfMiss: ['Juste a cote!','Presque!','Incroyable!','Nooon!','Encore?!','Vraiment?!'],
+    golfAgain: 'Encore un essai!',
+    golfContinue: '▶ NIVEAU SUIVANT',
+    golfPower: 'FORCE',
+    golfHold: '⛳ MAINTENIR =<br>PLUS DE FORCE',
+    golfRelease: '⛳ RELACHER!',
+    golfRoll: 'Un doux roulement... si proche!',
+    totalScore: 'Total: ',
+    scorePoints: ' pts',
+    allLevelsDone: 'Tous les niveaux termines!',
+    capLabel: 'BUT',
+    golfSceneTitle: 'DRUMPLY SE DETEND SUR LE TERRAIN DE GOLF',
+    golfNewsSoon: 'Nouveau rapport dans ',
+    golfNewsNow: 'BREAKING NEWS...',
+    newsStart: 'APPUYER POUR COMMENCER',
+    mission: 'MISSION: Drumply a besoin de la casquette rouge – c\'est le seul moyen de lancer sa prochaine manoeuvre de diversion. Il part a sa recherche.',
+    capHint: 'CAP >',
+    clipHeadlines: ['MEDIAS','JOURNAL','PRESSE','SCANDALE!','BREAKING','EXCLUSIF'],
+    pipeLabels: ['PARLEMENT','TRIBUNAUX','PRESSE'],
+    signSlogans: ['NON!','DEHORS!','STOP','ON VOUS VOIT','APPROCK?','MENTEUR','PAS DE DICTATURE','DEMOCRATIE'],
+    scandals: [
+      { breaking:'⚡ SCANDALE', headline:'LES PARTISANS DOUTENT DE DRUMPLY', body:'Meme les partisans les plus fervents s\'inquietent. Les sondages internes montrent un scepticisme croissant – le lien avec Approck ne peut plus etre ignore.', sub:'Sources: L\'ambiance bascule.' },
+      { breaking:'🚨 NOUVELLE REVELATION', headline:'ANCIENNES VIDEOS AVEC APPROCK REFONT SURFACE', body:'Des archives montrent Drumply et Approck riant ensemble lors d\'une fete de luxe. Les images deviennent virales en quelques minutes.', sub:'Drumply: "Je ne connais pas cet homme." – La video prouve le contraire.' },
+      { breaking:'📺 LATE NIGHT SE MOQUE', headline:'L\'ANIMATEUR TV DEMONTE DRUMPLY EN DIRECT', body:'L\'animateur Jay Fallowen consacre tout son monologue a l\'affaire Approck. Le clip atteint 50 millions de vues en 6 heures.', sub:'Drumply: "Fake news!" – Les audiences battent des records.' },
+      { breaking:'💀 SCANDALE ESCALADE', headline:'DRUMPLY TENTE DE MINIMISER – CA EMPIRE', body:'Les dementis frenetiques de Drumply attirent encore plus l\'attention. Les journalistes creusent. De nouveaux details emergent toutes les heures.', sub:'Experts: "Il aurait mieux fait de se taire."' },
+      { breaking:'🎬 DOCUMENTAIRE', headline:'DOCUMENTAIRE NATIONAL SUR APPROCK PUBLIE', body:'Quelques medias independants ont publie un documentaire national sur Approck. Son lien avec Drumply est le theme central.', sub:'Les chiffres de streaming battent tous les records.' },
+      { breaking:'✈️ SCANDALE DE VOYAGE', headline:'DES PROCHES DE DRUMPLY ONT VOYAGE AVEC APPROCK', body:'De nouvelles preuves montrent que des proches de Drumply ont voyage avec Approck en jet prive. Le scandale ressurgit.', sub:'La Maison Blanche refuse de commenter.' },
+      { breaking:'👗 LA PREMIERE DAME PARLE', headline:'LA FEMME DE DRUMPLY: JE N\'AI RIEN A VOIR AVEC APPROCK!', body:'Lors d\'une conference de presse surprise, la femme de Drumply a declare n\'avoir aucun lien avec Approck. L\'insistance ne fait que renforcer les soupcons.', sub:'Observateurs: "Pourquoi insiste-t-elle autant?"' },
+      { breaking:'✉️ LETTRE DIVULGUEE', headline:'UNE LETTRE SECRETE DE DRUMPLY A APPROCK PUBLIEE', body:'Une lettre manuscrite presumee de Drumply a Approck a ete divulguee. Drumply nie tout – mais le public devient de plus en plus mefiant au fur et a mesure que les details s\'accumulent.', sub:'Experts en ecriture: "Les similitudes sont frappantes."' },
+    ],
+    counters: [
+      { headline:'DRUMPLY MENACE LE CHEF DES FINANCES', body:'Drumply menace de licencier le chef de l\'autorite financiere. Les marches reagissent nerveusement – la crise economique detourne l\'attention.', sub:'Analystes: "Chaos politiquement motive."' },
+      { headline:'DES MILLIARDAIRES PROTEGENT DRUMPLY', body:'Les hommes les plus riches du pays declarent publiquement leur soutien. Les critiques parlent d\'argent du silence organise.', sub:'"Qui paie, commande." – Opposition indignee.' },
+      { headline:'DRUMPLY MENACE DE SAISIR L\'ILE D\'UN ALLIE', body:'Drumply laisse entendre qu\'il prendrait le controle de l\'ile d\'une nation alliee. Indignation internationale – Approck provisoirement oublie.', sub:'Les partenaires de l\'OTAN exigent des explications.' },
+      { headline:'DRUMPLY ENLEVE UN PRESIDENT ETRANGER', body:'Des forces speciales amenent le president d\'un pays ami a la Maison Blanche. Indignation mondiale – personne ne parle plus d\'Approck.', sub:'Le Conseil de securite de l\'ONU tient une reunion d\'urgence.' },
+      { headline:'DRUMPLY DECLENCHE UNE GUERRE AU LOIN', body:'Drumply ordonne une operation militaire dans une region lointaine. Les medias internationaux rapportent 24h/24. Approck? Enterre.', sub:'Drumply: "Nous protegeon la liberte."' },
+      { headline:'DRUMPLY S\'EN PREND AUX NON-ORANGES', body:'Drumply deploie des agents armes pour arreter et expulser les personnes non-oranges. Enorme indignation – Approck n\'est plus le sujet.', sub:'Droits civiques: "C\'est une attaque contre la constitution."' },
+      { headline:'DRUMPLY LANCE SA PROPRE CRYPTOMONNAIE', body:'Apres un fort depart, le Drumply-Coin s\'effondre massivement. Les investisseurs perdent tout – Drumply s\'enrichit. Toute presse vaut mieux que la presse Approck.', sub:'Experts: "Le plus grand pump-and-dump de l\'histoire."' },
+      { headline:'DRUMPLY DETRUIT UNE PARTIE DE LA RESIDENCE', body:'Drumply fait demolir des parties de la residence presidentielle pour un batiment de prestige pompeux. Beaucoup sont indignés par les coûts. Approck oublie.', sub:'Facture: 4 milliards. Les contribuables paient.' },
+      { headline:'DRUMPLY RENVOIE DES MINISTRES ET LES INSULTE', body:'Drumply licencie publiquement plusieurs ministres et les tourne en derision lors de conferences de presse. Le chaos domine les titres – ses propres scandales et l\'affaire Approck sont completement eclipses.', sub:'Ex-ministre: "Il sacrifie tout le monde pour se proteger."' },
+    ],
+  },
+};
+
+function t(key){ return T[lang][key]; }
+
+function setLang(l){
+  lang=l;
+  document.querySelectorAll('.langBtn').forEach(function(b){
+    b.classList.toggle('active', b.textContent.toLowerCase().includes(l));
+  });
+  document.getElementById('titleLabel').textContent=t('titleSub');
+  // Update static HTML texts
+  applyTranslations();
+  // Re-init pools with new language data
+  initLevelPools();
+}
+
+function applyTranslations(){
+  // Intro panel
+  var introTitle=document.querySelector('#introPanel .drumplyTitle');
+  if(introTitle) introTitle.textContent=t('title');
+  var introBody=document.querySelector('#introPanel .introBodyText');
+  if(introBody) introBody.innerHTML=t('introBody');
+  var introCta=document.querySelector('#introPanel .introCta');
+  if(introCta) introCta.textContent=t('introPressStart');
+  // Skandal panel
+  var skandalTitleEl=document.getElementById('skandalTitle');
+  if(skandalTitleEl) skandalTitleEl.textContent=t('skandalTitle');
+  var skandalSubEl=document.getElementById('skandalSub');
+  if(skandalSubEl) skandalSubEl.textContent=t('skandalSub');
+  var skandalBtn=document.getElementById('skandalContinueBtn');
+  if(skandalBtn) skandalBtn.innerHTML=t('skandalBtn');
+  // Gameover
+  var goTitle=document.getElementById('goTitle');
+  if(goTitle) goTitle.textContent=t('gameoverTitle');
+  var goHeadline=document.getElementById('goHeadline');
+  if(goHeadline) goHeadline.textContent=t('gameoverHeadline');
+  var goBodyText=document.getElementById('goBodyText');
+  if(goBodyText) goBodyText.textContent=t('gameoverBody');
+  var goBtnEl=document.querySelector('#gameoverPanel .nCta');
+  if(goBtnEl) goBtnEl.textContent=t('gameoverBtn');
+  var newsCta=document.querySelector('#newsOverlay .nCta');
+  if(newsCta) newsCta.textContent=t('newsStart');
+  var golfContBtn=document.getElementById('golfContinueBtn');
+  if(golfContBtn) golfContBtn.innerHTML=t('golfContinue');
+  var kraftLbl=document.getElementById('kraftLabel');
+  if(kraftLbl) kraftLbl.textContent=t('golfPower');
+  var golfBtnEl=document.getElementById('golfBtn');
+  if(golfBtnEl) golfBtnEl.innerHTML=t('golfHold');
+  scorEl.textContent=t('scoreLabel')+totalScore;
+  document.getElementById('titleLabel').textContent=t('titleSub');
+  var ts2=document.getElementById('titleSub2');
+  if(ts2) ts2.textContent=lang==='de'?'POLITISCHE SATIRE':lang==='fr'?'SATIRE POLITIQUE':'POLITICAL SATIRE';
+  updateHighscoreDisplay();
+}
+
+function shuffle(arr){ for(var i=arr.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1));var tmp=arr[i];arr[i]=arr[j];arr[j]=tmp; } return arr; }
+var shuffledScandals=[], shuffledCounters=[];
+function initLevelPools(){
+  shuffledScandals=shuffle(t('scandals').slice());
+  shuffledCounters=shuffle(t('counters').slice());
+}
+function getLevelData(){
+  var si=level%shuffledScandals.length, ci=level%shuffledCounters.length;
+  var scandal={}; var src=shuffledScandals[si];
+  scandal.breaking=src.breaking; scandal.headline=src.headline;
+  scandal.body=src.body; scandal.sub=src.sub;
+  scandal.level='LEVEL '+(level+1);
+  return { scandal:scandal, counter: shuffledCounters[ci] };
+}
+
+// Level difficulty
+const LEVEL_CFG = [
+  { pipeSpeed:1.0, gap:225, pipeInterval:120, gravity:0.22, jumpForce:-5.4, villainSpeed:0.04 },
+  { pipeSpeed:1.3, gap:205, pipeInterval:110, gravity:0.25, jumpForce:-5.7, villainSpeed:0.06 },
+  { pipeSpeed:1.6, gap:188, pipeInterval:100, gravity:0.28, jumpForce:-6.0, villainSpeed:0.09 },
+  { pipeSpeed:1.9, gap:172, pipeInterval:90,  gravity:0.31, jumpForce:-6.3, villainSpeed:0.13 },
+  { pipeSpeed:2.2, gap:158, pipeInterval:82,  gravity:0.34, jumpForce:-6.6, villainSpeed:0.17 },
+  { pipeSpeed:2.5, gap:145, pipeInterval:75,  gravity:0.37, jumpForce:-6.9, villainSpeed:0.22 },
+];
+function getCfg(){ return LEVEL_CFG[Math.min(level, LEVEL_CFG.length-1)]; }
+
+// ── SOUND (stubs - audio requires webserver, not local file) ───────────────
+function unlockAudio(){}
+function resumeAudio(){}
+function playFlap(){}
+function playScore(){}
+function playCrash(){}
+function playWin(){}
+const PIPE_W=52;
+let LEVEL1_TIME=45;
+let state='intro';
+let level=0;
+let bird,pipes,score,frame,particles,scorePopups,startTime,elapsed,villain;
+let golfFrame=0,golfBallActive=false,golfBallX,golfBallY,golfBallVX,golfBallVY,golfMissed=0,golfSwingCount=0;
+let bgClouds=Array.from({length:4},(_,i)=>({x:(i/4)*360+60,y:30+Math.random()*50,w:42+Math.random()*38,speed:0.1+Math.random()*0.1}));
+
+function roundRect(c,x,y,w,h,r){
+  c.beginPath();c.moveTo(x+r,y);c.lineTo(x+w-r,y);
+  c.quadraticCurveTo(x+w,y,x+w,y+r);c.lineTo(x+w,y+h-r);
+  c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);c.lineTo(x+r,y+h);
+  c.quadraticCurveTo(x,y+h,x,y+h-r);c.lineTo(x,y+r);
+  c.quadraticCurveTo(x,y,x+r,y);c.closePath();
+}
+
+// ── SHOW NEWS CARD – newspaper spin fly-in ─────────────────────────────────
+function showNewsCard(data, onTap){
+  document.getElementById('nBreaking').textContent    = data.breaking||'BREAKING NEWS';
+  document.getElementById('nHeadline').textContent    = data.headline;
+  document.getElementById('nBody').textContent        = data.body;
+  document.getElementById('nSub').textContent         = data.sub||'';
+  document.getElementById('nLevelBadge').textContent  = data.level||'';
+  // Orange mission banner
+  if(nMission){
+    nMission.textContent=t('mission');
+    nMission.style.display='block';
+  }
+
+  // Reset animation
+  newsCard.classList.remove('spin-in','spin-out');
+  void newsCard.offsetWidth; // force reflow so animation restarts
+
+  newsOverlay.classList.remove('hidden');
+  newsOverlay.style.opacity='1';
+
+  // Trigger spin-in
+  newsCard.classList.add('spin-in');
+
+  newsOverlay._onTap = onTap;
+}
+
+newsOverlay.addEventListener('click',()=>{
+  if(!newsOverlay._onTap) return;
+  var fn = newsOverlay._onTap;
+  newsOverlay._onTap = null;
+  newsCard.classList.remove('spin-in');
+  newsCard.classList.add('spin-out');
+  var _fn=fn;
+  setTimeout(function(){
+    newsOverlay.classList.add('hidden');
+    newsCard.classList.remove('spin-out');
+    _fn();
+  }, 480);
+});
+
+// ── INIT GAME ──────────────────────────────────────────────────────────────
+let totalScore=0; // persists across levels
+
+function updateHighscoreDisplay(){
+  try {
+    var personal=parseInt(localStorage.getItem('drumply_hs')||'0');
+    var global=parseInt(localStorage.getItem('drumply_hs_global')||'0');
+    var el=document.getElementById('highscoreDisplay');
+    if(!el) return;
+    var out=[];
+    if(global>0)   out.push(t('hsGlobal')+global);
+    if(personal>0) out.push(t('hsPersonal')+personal);
+    el.innerHTML=out.join('<br>');
+  } catch(e) {}
+}
+
+function saveHighscore(){
+  try {
+    var personal=parseInt(localStorage.getItem('drumply_hs')||'0');
+    if(totalScore>personal) localStorage.setItem('drumply_hs',totalScore);
+    var global=parseInt(localStorage.getItem('drumply_hs_global')||'0');
+    if(totalScore>global) localStorage.setItem('drumply_hs_global',totalScore);
+  } catch(e) {}
+}
+
+
+var _sprintTarget=0, _sprintStart=0, _sprintBirdY=0, _sprintT0=0;
+function doSprintApprock(birdX, birdY){
+  _sprintTarget = birdX - 10;
+  _sprintStart  = villain.x;
+  _sprintBirdY  = birdY;
+  _sprintT0     = performance.now();
+  _runSprint();
+}
+function _runSprint(){
+  var prog = Math.min((performance.now()-_sprintT0)/350, 1);
+  villain.x = _sprintStart + (_sprintTarget - _sprintStart)*prog;
+  villain.y += (_sprintBirdY - villain.y)*0.15;
+  if(prog < 1){
+    requestAnimationFrame(_runSprint);
+  } else {
+    document.getElementById('goScore').innerHTML=t('totalScore')+'<b>'+totalScore+t('scorePoints')+'</b>';
+    setTimeout(function(){ gameoverPanel.classList.remove('hidden'); }, 200);
+  }
+}
+
+function initGame(){
+  let cfg=getCfg();
+  LEVEL1_TIME = 75; // always exactly 75 seconds
+  bird={x:90,y:H/2,vy:0,r:18};
+  pipes=[];score=0;frame=0;
+  particles=[];scorePopups=[];
+  startTime=performance.now();elapsed=0;
+  villain={x:-55,y:H/2,speed:cfg.villainSpeed,bobPhase:0};
+  capActive=false; capX=0; capY=0; capPipe=null;
+  pipeSpawnCount=0; lastPipeTime=0;
+  scorEl.textContent=t('scoreLabel')+totalScore;
+  timerEl.textContent='';
+}
+
+// ── WHITE HOUSE BACKGROUND ─────────────────────────────────────────────────
+function drawWhiteHouseBackground(){
+  let sky=ctx.createLinearGradient(0,0,0,H*0.62);
+  sky.addColorStop(0,'#87CEEB');sky.addColorStop(1,'#c8e8f8');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H*0.62);
+
+  bgClouds.forEach(cl=>{
+    cl.x-=cl.speed;if(cl.x<-cl.w-20)cl.x=W+cl.w;
+    ctx.fillStyle='rgba(255,255,255,0.85)';
+    ctx.beginPath();ctx.ellipse(cl.x,cl.y,cl.w,14,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(cl.x-cl.w*.3,cl.y+8,cl.w*.5,11,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(cl.x+cl.w*.3,cl.y+6,cl.w*.42,10,0,0,Math.PI*2);ctx.fill();
+  });
+
+  let lawn=ctx.createLinearGradient(0,H*.58,0,H);
+  lawn.addColorStop(0,'#4caf50');lawn.addColorStop(1,'#2e7d32');
+  ctx.fillStyle=lawn;ctx.fillRect(0,H*.58,W,H);
+  ctx.strokeStyle='rgba(0,0,0,0.05)';ctx.lineWidth=8;
+  for(let x=0;x<W;x+=16){ctx.beginPath();ctx.moveTo(x,H*.58);ctx.lineTo(x,H);ctx.stroke();}
+
+  let hx=W/2,hy=H*.62;
+  ctx.fillStyle='rgba(0,0,0,0.09)';ctx.fillRect(hx-95,hy-115,192,10);
+  let wg=ctx.createLinearGradient(hx-94,0,hx+94,0);
+  wg.addColorStop(0,'#e8e8e8');wg.addColorStop(.15,'#ffffff');
+  wg.addColorStop(.85,'#f5f5f5');wg.addColorStop(1,'#dcdcdc');
+  ctx.fillStyle=wg;ctx.fillRect(hx-94,hy-115,188,115);
+  ctx.fillStyle='#e0e0e0';ctx.fillRect(hx-98,hy-122,196,10);
+  ctx.fillStyle='#d0d0d0';ctx.fillRect(hx-98,hy-122,196,3);
+  ctx.fillStyle='#f0f0f0';
+  ctx.fillRect(hx-145,hy-85,55,85);ctx.fillRect(hx+90,hy-85,55,85);
+  ctx.fillStyle='#d8d8d8';
+  ctx.fillRect(hx-148,hy-90,61,8);ctx.fillRect(hx+87,hy-90,61,8);
+  ctx.fillStyle='#e8e8e8';
+  ctx.beginPath();ctx.moveTo(hx-55,hy-115);ctx.lineTo(hx,hy-140);ctx.lineTo(hx+55,hy-115);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#ccc';ctx.lineWidth=1.5;ctx.stroke();
+
+  [-44,-26,-10,10,26,44].forEach(cx=>{
+    let cg=ctx.createLinearGradient(hx+cx-4,0,hx+cx+4,0);
+    cg.addColorStop(0,'#ddd');cg.addColorStop(.4,'#fff');cg.addColorStop(1,'#ccc');
+    ctx.fillStyle=cg;ctx.fillRect(hx+cx-4,hy-115,8,100);
+    ctx.fillStyle='#e8e8e8';ctx.fillRect(hx+cx-6,hy-118,12,4);ctx.fillRect(hx+cx-6,hy-18,12,4);
+  });
+  [-138,-126,-114,-102,102,114,126,138].forEach(cx=>{
+    let cg2=ctx.createLinearGradient(hx+cx-3,0,hx+cx+3,0);
+    cg2.addColorStop(0,'#ddd');cg2.addColorStop(.5,'#f8f8f8');cg2.addColorStop(1,'#ccc');
+    ctx.fillStyle=cg2;ctx.fillRect(hx+cx-3,hy-85,6,72);
+    ctx.fillStyle='#e0e0e0';ctx.fillRect(hx+cx-5,hy-88,10,4);ctx.fillRect(hx+cx-5,hy-14,10,3);
+  });
+  var wins1=[[-60,-70],[-30,-70],[0,-70],[30,-70],[60,-70]];
+  wins1.forEach(function(w){var wx=w[0],wy=w[1];
+    ctx.fillStyle='#b8d4e8';ctx.fillRect(hx+wx-6,hy+wy,12,16);
+    ctx.strokeStyle='#ccc';ctx.lineWidth=.8;ctx.strokeRect(hx+wx-6,hy+wy,12,16);
+    ctx.beginPath();ctx.moveTo(hx+wx,hy+wy);ctx.lineTo(hx+wx,hy+wy+16);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(hx+wx-6,hy+wy+8);ctx.lineTo(hx+wx+6,hy+wy+8);ctx.stroke();
+  });
+  var wins2=[[-60,-42],[-30,-42],[30,-42],[60,-42]];
+  wins2.forEach(function(w){var wx=w[0],wy=w[1];
+    ctx.fillStyle='#b8d4e8';ctx.fillRect(hx+wx-6,hy+wy,12,18);
+    ctx.strokeStyle='#ccc';ctx.lineWidth=.8;ctx.strokeRect(hx+wx-6,hy+wy,12,18);
+    ctx.beginPath();ctx.moveTo(hx+wx,hy+wy);ctx.lineTo(hx+wx,hy+wy+18);ctx.stroke();
+  });
+  ctx.fillStyle='#8aaa88';roundRect(ctx,hx-10,hy-26,20,26,3);ctx.fill();
+  ctx.strokeStyle='#666';ctx.lineWidth=1;ctx.strokeRect(hx-10,hy-26,20,26);
+  ctx.beginPath();ctx.moveTo(hx,hy-26);ctx.lineTo(hx,hy);ctx.stroke();
+  ctx.beginPath();ctx.arc(hx,hy-26,10,Math.PI,0);
+  ctx.fillStyle='#b8d4e8';ctx.fill();
+  ctx.fillStyle='#e4e4e4';ctx.fillRect(hx-60,hy-6,120,3);
+  ctx.fillStyle='#eee';ctx.fillRect(hx-55,hy-3,110,3);
+  ctx.fillStyle='#f0f0f0';ctx.fillRect(hx-50,hy,100,3);
+  ctx.strokeStyle='#aaa';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(hx,hy-140);ctx.lineTo(hx,hy-168);ctx.stroke();
+  let waveFlag=Math.sin(frame*.05)*3;
+  ctx.fillStyle='#cc0000';
+  ctx.beginPath();ctx.moveTo(hx,hy-168);ctx.lineTo(hx+18,hy-161+waveFlag);ctx.lineTo(hx,hy-154);ctx.closePath();ctx.fill();
+
+  // Protest signs on lawn – more per level, subtle
+  let signCount = Math.min(level+1, 8);
+  var signSlogans=t('signSlogans');
+  ctx.font='bold 5px sans-serif';
+  for(let s=0;s<signCount;s++){
+    let sx = 15 + (s*(W-20)/Math.max(signCount,1)) + (s%2===0?5:-5);
+    let sy = H - 38;
+    let col = s%2===0 ? '#fff' : '#ffdd00';
+    // Stick
+    ctx.strokeStyle='#8B6914'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx,sy-18); ctx.stroke();
+    // Sign board
+    ctx.fillStyle=s%3===0?'#cc0000':s%3===1?'#fff':'#ffdd00';
+    ctx.fillRect(sx-11,sy-28,22,10);
+    ctx.strokeStyle='rgba(0,0,0,0.3)'; ctx.lineWidth=0.5;
+    ctx.strokeRect(sx-11,sy-28,22,10);
+    // Text
+    ctx.fillStyle=s%3===0?'#fff':'#000';
+    ctx.textAlign='center';
+    ctx.fillText(signSlogans[s%signSlogans.length], sx, sy-20);
+  }
+  ctx.textAlign='left';
+
+  // Dark overlay to keep game readable
+  ctx.fillStyle='rgba(0,0,30,0.36)';ctx.fillRect(0,0,W,H);
+}
+
+// ── DRUMPLY ────────────────────────────────────────────────────────────────
+function drawDrumply(x,y){
+  ctx.save();ctx.translate(x,y);
+  let tilt=Math.min(Math.max(bird.vy*2.5,-25),60);
+  ctx.rotate((tilt*Math.PI)/180);
+  ctx.fillStyle='#FFD700';
+  ctx.beginPath();ctx.ellipse(0,-22,18,10,-.3,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(8,-26,10,7,.5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#FF7518';ctx.beginPath();ctx.arc(0,0,20,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#FF8C42';
+  ctx.beginPath();ctx.arc(-10,6,8,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(10,6,8,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.beginPath();ctx.ellipse(-7,-4,5,4,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(7,-4,5,4,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#4488ff';
+  ctx.beginPath();ctx.arc(-7,-4,2.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(7,-4,2.5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#000';
+  ctx.beginPath();ctx.arc(-7,-4,1.2,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(7,-4,1.2,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#cc3300';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.arc(0,8,8,.2,Math.PI-.2);ctx.stroke();
+  ctx.fillStyle='#cc0000';
+  ctx.beginPath();ctx.moveTo(-4,18);ctx.lineTo(4,18);ctx.lineTo(6,32);
+  ctx.lineTo(0,38);ctx.lineTo(-6,32);ctx.closePath();ctx.fill();
+  // Red victory cap when level cleared
+  if(state==='skandal'){
+    ctx.fillStyle='#cc0000';
+    ctx.beginPath(); ctx.ellipse(0,-30,20,8,0,0,Math.PI*2); ctx.fill();
+    ctx.fillRect(-20,-36,40,8);
+    ctx.fillStyle='#aa0000'; ctx.fillRect(-22,-36,42,4);
+    ctx.fillStyle='#cc0000'; ctx.fillRect(-24,-30,10,4);
+    ctx.fillStyle='#FFD700'; ctx.font='bold 10px serif'; ctx.textAlign='center';
+    ctx.fillText('★',0,-31);
+  }
+
+  ctx.restore();
+}
+
+// ── APPROCK (villain) ──────────────────────────────────────────────────────
+function drawApprock(x,y){
+  ctx.save();ctx.translate(x,y);
+  ctx.translate(0,Math.sin(villain.bobPhase)*4);
+  // Sinister purple glow
+  var glow=ctx.createRadialGradient(0,0,8,0,0,55);
+  glow.addColorStop(0,'rgba(120,0,180,0.5)');glow.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=glow;ctx.beginPath();ctx.arc(0,0,55,0,Math.PI*2);ctx.fill();
+  // Name tag BELOW face - always visible even at screen edge
+  if(!_approckHideNameTag){
+    ctx.fillStyle='rgba(0,0,0,0.88)';
+    roundRect(ctx,-28,26,56,16,3);ctx.fill();
+    ctx.strokeStyle='#ff4444';ctx.lineWidth=1.5;
+    roundRect(ctx,-28,26,56,16,3);ctx.stroke();
+    ctx.fillStyle='#ff4444';ctx.font='bold 9px sans-serif';ctx.textAlign='center';
+    ctx.fillText('APPROCK',0,38);ctx.textAlign='left';
+  }
+  // Scraggly wispy white hair
+  ctx.fillStyle='#d0d0d0';ctx.beginPath();ctx.ellipse(0,-22,15,8,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#bbb';ctx.lineWidth=1.5;ctx.lineCap='round';
+  for(var hi=-2;hi<=2;hi++){
+    ctx.beginPath();ctx.moveTo(hi*5,-22);
+    ctx.bezierCurveTo(hi*5-2,-28,hi*6+1,-32,hi*6,-34);
+    ctx.stroke();
+  }
+  // Face - pale sallow with gradient
+  var fg=ctx.createRadialGradient(-3,-3,2,0,0,20);
+  fg.addColorStop(0,'#f0dfc8');fg.addColorStop(1,'#d4b896');
+  ctx.fillStyle=fg;ctx.beginPath();ctx.arc(0,0,20,0,Math.PI*2);ctx.fill();
+  // Wrinkles
+  ctx.strokeStyle='rgba(100,60,20,0.35)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(-14,-8);ctx.bezierCurveTo(-10,-6,-6,-6,-4,-8);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(4,-8);ctx.bezierCurveTo(6,-6,10,-6,14,-8);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-8,-14);ctx.lineTo(-6,-10);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(6,-14);ctx.lineTo(8,-10);ctx.stroke();
+  // Age spots
+  ctx.fillStyle='rgba(130,80,40,0.45)';
+  var spots=[-8,6,-3,10,-12],spotY=[4,-6,10,-2,2];
+  for(var si=0;si<spots.length;si++){ctx.beginPath();ctx.arc(spots[si],spotY[si],2.5,0,Math.PI*2);ctx.fill();}
+  // Dark under-eye circles
+  ctx.fillStyle='rgba(80,40,20,0.3)';
+  ctx.beginPath();ctx.ellipse(-7,-4,7,5,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(7,-4,7,5,0,0,Math.PI*2);ctx.fill();
+  // Eyes
+  ctx.fillStyle='#fff';
+  ctx.beginPath();ctx.ellipse(-7,-4,5,4,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(7,-4,5,4,0,0,Math.PI*2);ctx.fill();
+  // Shifty pupils looking right (toward Drumply)
+  ctx.fillStyle='#1a0a00';
+  ctx.beginPath();ctx.arc(-5,-4,2.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(9,-4,2.5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.beginPath();ctx.arc(-4,-5,1,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(10,-5,1,0,Math.PI*2);ctx.fill();
+  // Thick bushy grey eyebrows
+  ctx.strokeStyle='#999';ctx.lineWidth=5;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(-13,-11);ctx.bezierCurveTo(-9,-15,-5,-14,-2,-11);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(2,-11);ctx.bezierCurveTo(5,-14,9,-15,13,-11);ctx.stroke();
+  // Bulbous veiny nose
+  ctx.fillStyle='#c07050';
+  ctx.beginPath();ctx.ellipse(0,1,5,4,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(160,60,40,0.3)';ctx.lineWidth=0.8;
+  ctx.beginPath();ctx.moveTo(-3,0);ctx.bezierCurveTo(-2,3,2,3,3,0);ctx.stroke();
+  // Thin creepy smile
+  ctx.strokeStyle='#7a4030';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(0,10,8,0.15,Math.PI-0.15);ctx.stroke();
+  // Dark suit
+  ctx.fillStyle='#0d0d1e';
+  ctx.beginPath();ctx.moveTo(-22,18);ctx.lineTo(22,18);ctx.lineTo(18,44);ctx.lineTo(-18,44);ctx.closePath();ctx.fill();
+  // White shirt
+  ctx.fillStyle='#eee';
+  ctx.beginPath();ctx.moveTo(-5,18);ctx.lineTo(5,18);ctx.lineTo(4,30);ctx.lineTo(-4,30);ctx.closePath();ctx.fill();
+  // Gold $
+  ctx.fillStyle='#FFD700';ctx.font='bold 16px serif';ctx.textAlign='center';ctx.fillText('$',0,36);
+  // Gold watch
+  ctx.fillStyle='#FFD700';ctx.fillRect(-21,28,7,4);
+  ctx.strokeStyle='#cc9900';ctx.lineWidth=0.8;ctx.strokeRect(-21,28,7,4);
+  ctx.textAlign='left';ctx.restore();
+}
+
+var _approckHideNameTag=false;
+
+// Approck on pipe: name tag above head
+function drawApprockOnPipe(x, y){
+  ctx.save(); ctx.translate(x, y);
+  ctx.translate(0, Math.sin(villain.bobPhase)*3);
+  // Name tag ABOVE head
+  ctx.fillStyle='rgba(0,0,0,0.92)';
+  roundRect(ctx,-28,-48,56,16,3);ctx.fill();
+  ctx.strokeStyle='#ff4444';ctx.lineWidth=1.5;
+  roundRect(ctx,-28,-48,56,16,3);ctx.stroke();
+  ctx.fillStyle='#ff4444';ctx.font='bold 9px sans-serif';ctx.textAlign='center';
+  ctx.fillText('APPROCK',0,-36);
+  ctx.textAlign='left';
+  ctx.restore();
+  // Draw body without its own name tag
+  _approckHideNameTag=true;
+  drawApprock(x, y);
+  _approckHideNameTag=false;
+}
+
+// ── GOLF SCENE ─────────────────────────────────────────────────────────────
+const HOLE_X=255, HOLE_Y_FRAC=0.615;
+function drawGolfScene(f){
+  let hY=H*HOLE_Y_FRAC;
+  let sky=ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#5bc8f5');sky.addColorStop(1,'#c8f0a0');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(255,230,50,0.18)';ctx.beginPath();ctx.arc(300,60,58,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#FFE066';ctx.beginPath();ctx.arc(300,60,36,0,Math.PI*2);ctx.fill();
+  [[60,80,60],[190,55,55],[280,100,40]].forEach(function(cl){var cx=cl[0],cy=cl[1],cw=cl[2];
+    ctx.fillStyle='rgba(255,255,255,0.88)';
+    ctx.beginPath();ctx.ellipse(cx,cy,cw,18,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(cx-cw*.3,cy+10,cw*.5,13,0,0,Math.PI*2);ctx.fill();
+  });
+  let grass=ctx.createLinearGradient(0,H*.52,0,H);
+  grass.addColorStop(0,'#56ab2f');grass.addColorStop(1,'#2d6a0f');
+  ctx.fillStyle=grass;ctx.fillRect(0,H*.52,W,H);
+  ctx.fillStyle='#72c442';ctx.beginPath();ctx.ellipse(HOLE_X,H*.60,75,32,0,0,Math.PI*2);ctx.fill();
+  // Hole
+  ctx.fillStyle='#111';ctx.beginPath();ctx.ellipse(HOLE_X,hY,9,4,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#aaa';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(HOLE_X,hY);ctx.lineTo(HOLE_X,hY-55);ctx.stroke();
+  ctx.fillStyle='#cc0000';
+  ctx.beginPath();ctx.moveTo(HOLE_X,hY-55);ctx.lineTo(HOLE_X+25,hY-46);ctx.lineTo(HOLE_X,hY-37);ctx.closePath();ctx.fill();
+  // Trees
+  [30,315].forEach(tx=>{
+    ctx.fillStyle='#1a5c1a';
+    ctx.beginPath();ctx.moveTo(tx,H*.52);ctx.lineTo(tx-22,H*.38);ctx.lineTo(tx+22,H*.38);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(tx,H*.40);ctx.lineTo(tx-18,H*.28);ctx.lineTo(tx+18,H*.28);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#5c3d1a';ctx.fillRect(tx-5,H*.52,10,20);
+  });
+
+  // Drumply figure
+  let dX=115,dY=H*.565,sw=Math.sin(f*.035)*.8;
+  ctx.save();ctx.translate(dX,dY);
+  ctx.fillStyle='rgba(0,0,0,0.1)';ctx.beginPath();ctx.ellipse(0,62,20,6,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#daa520';ctx.lineWidth=7;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(0,32);ctx.lineTo(-12,58);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,32);ctx.lineTo(12,58);ctx.stroke();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(-14,60,9,4,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(14,60,9,4,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#f8f8f8';ctx.beginPath();ctx.ellipse(0,14,15,20,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#cc0000';ctx.fillRect(-15,8,30,4);
+  ctx.save();ctx.rotate(sw);
+  ctx.strokeStyle='#FF7518';ctx.lineWidth=5;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(0,6);ctx.lineTo(20,26);ctx.stroke();
+  ctx.strokeStyle='#888';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(20,26);ctx.lineTo(38,58);ctx.stroke();
+  ctx.fillStyle='#555';ctx.beginPath();ctx.ellipse(39,61,6,4,sw,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle='#FF7518';ctx.lineWidth=5;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(0,6);ctx.lineTo(-16,20);ctx.stroke();
+  ctx.fillStyle='#f0f0f0';ctx.beginPath();ctx.ellipse(0,-30,19,8,0,0,Math.PI*2);ctx.fill();
+  ctx.fillRect(-19,-34,38,8);ctx.fillStyle='#ddd';ctx.fillRect(-21,-34,38,5);
+  ctx.fillStyle='#FF7518';ctx.beginPath();ctx.arc(0,-18,17,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#FFD700';ctx.beginPath();ctx.ellipse(0,-34,10,5,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.beginPath();ctx.ellipse(-6,-20,4,3,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(6,-20,4,3,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#4488ff';
+  ctx.beginPath();ctx.arc(-6,-20,2,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(6,-20,2,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#cc3300';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(0,-12,7,.1,Math.PI-.1);ctx.stroke();
+  ctx.restore();
+
+  // Ball
+  let bSX=dX+45,bSY=dY+62;
+  if(!golfBallActive){
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bSX,bSY,5,0,Math.PI*2);ctx.fill();
+  } else {
+    golfBallVY+=0.22;
+    golfBallX+=golfBallVX; golfBallY+=golfBallVY;
+    // Near hole? bounce off convincingly
+    let dx=golfBallX-HOLE_X, dy=golfBallY-hY;
+    if(Math.sqrt(dx*dx+dy*dy)<16){
+      golfBallVX=(dx>0?1:-1)*Math.abs(golfBallVX)*0.5+(Math.random()-0.5)*2;
+      golfBallVY=-Math.abs(golfBallVY)*0.6;
+      golfMissed++;
+      var msgs=t('golfMiss');
+      golfMsg.textContent=msgs[Math.min(golfMissed-1,msgs.length-1)];
+    }
+    if(golfBallY>H+20||golfBallX<-20||golfBallX>W+20){
+      golfBallActive=false;
+      golfMsg.textContent=t('golfAgain');
+    }
+    ctx.fillStyle='rgba(255,255,255,0.22)';
+    for(var ti=1;ti<=5;ti++){
+      var px=golfBallX+golfBallVX*ti*1.5;
+      var py=golfBallY+golfBallVY*ti*1.5+0.22*ti*ti*2.25;
+      ctx.beginPath();ctx.arc(px,py,1.5,0,Math.PI*2);ctx.fill();
+    }
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(golfBallX,golfBallY,5,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#ddd';ctx.lineWidth=.8;ctx.beginPath();ctx.arc(golfBallX,golfBallY,5,0,Math.PI*2);ctx.stroke();
+  }
+
+  // Countdown bar
+  let secLeft=Math.max(0,Math.ceil(8-f/60));
+  ctx.fillStyle='rgba(0,0,0,0.55)';
+  roundRect(ctx,20,H-72,W-40,52,8);ctx.fill();
+  ctx.fillStyle='#00cc44';ctx.font='bold 13px "Bebas Neue",sans-serif';ctx.textAlign='center';
+  ctx.fillText(t('golfSceneTitle'),W/2,H-50);
+  ctx.fillStyle=secLeft<=3?'#ff4400':'#ffdd00';
+  ctx.font='bold 11px "Special Elite",cursive';
+  ctx.fillText(secLeft>0?t('golfNewsSoon')+secLeft+'s...':t('golfNewsNow'),W/2,H-28);
+  ctx.textAlign='left';
+}
+
+// ── GOLF POWER BAR ─────────────────────────────────────────────────────────
+let golfPower=0, golfCharging=false, golfPressStart=0;
+const powerBar=document.getElementById('powerBar');
+const golfBtn=document.getElementById('golfBtn');
+
+function golfPressStart_fn(){
+  if(golfBallActive||state!=='golf')return;
+  golfCharging=true;
+  golfPressStart=performance.now();
+  golfBtn.style.animation='none';
+  golfBtn.innerHTML=t('golfRelease');
+}
+function golfPressEnd_fn(){
+  if(!golfCharging||state!=='golf')return;
+  golfCharging=false;
+  let held=Math.min((performance.now()-golfPressStart)/1200,1);
+  golfPower=held;
+  powerBar.style.width='0%';
+  golfBtn.style.animation='blink 1.2s infinite';
+  golfBtn.innerHTML=t('golfHold');
+  golfFire(golfPower);
+}
+
+golfBtn.addEventListener('mousedown', golfPressStart_fn);
+golfBtn.addEventListener('touchstart', e=>{e.preventDefault();golfPressStart_fn();},{passive:false});
+golfBtn.addEventListener('mouseup', golfPressEnd_fn);
+golfBtn.addEventListener('touchend', e=>{e.preventDefault();golfPressEnd_fn();},{passive:false});
+
+function updatePowerBar(){
+  if(!golfCharging)return;
+  let held=Math.min((performance.now()-golfPressStart)/1200,1);
+  powerBar.style.width=(held*100)+'%';
+}
+
+function golfFire(power){
+  if(golfBallActive)return;
+  golfBallActive=true;
+  let dX=115, dY=H*0.565;
+  golfBallX=dX+45; golfBallY=dY+62;
+  let dx=HOLE_X-golfBallX, dy=H*HOLE_Y_FRAC-golfBallY;
+  let baseAngle=Math.atan2(dy,dx);
+  let missDir=(Math.random()>0.5?1:-1);
+  golfSwingCount++;
+
+  if(Math.random()<0.25){
+    // SHORT (25%): barely moves, rolls gently toward hole
+    let spd=0.5+Math.random()*0.5;
+    golfBallVX=Math.cos(baseAngle)*spd;
+    golfBallVY=Math.sin(baseAngle)*spd*0.2;
+    golfMsg.textContent=t('golfShort');
+  } else {
+    // LONG (75%): way too far
+    let spd=13+power*9+Math.random()*5;
+    let angle=baseAngle+missDir*(0.35+Math.random()*0.4);
+    golfBallVX=Math.cos(angle)*spd;
+    golfBallVY=Math.sin(angle)*spd-spd*0.55;
+    var msgs=t('golfTooFar');
+    golfMsg.textContent=msgs[Math.floor(Math.random()*msgs.length)];
+  }
+}
+
+function golfSwing(){ golfFire(0.8); }
+
+// ── PIPES ──────────────────────────────────────────────────────────────────
+function spawnPipe(){
+  var cfg=getCfg(),minY=90,maxY=H-100-cfg.gap;
+  var r=Math.random();
+  var pl=t('pipeLabels'); var label=r<0.33?pl[0]:r<0.66?pl[1]:pl[2];
+  var newspaper = label==='PRESSE' && Math.random()<0.5;
+  pipeSpawnCount++;
+  var hasApprock = (pipeSpawnCount % 15 === 0);
+  var pipe={x:W+PIPE_W,topH:Math.random()*(maxY-minY)+minY,passed:false,label:label,newspaper:newspaper,hasApprock:hasApprock,gap:cfg.gap};
+  pipes.push(pipe);
+  // If cap is waiting for a pipe, attach to this one
+  if(capActive && !capPipe){
+    capPipe=pipe;
+  }
+}
+
+var CLIP_HEADLINES=[''];// dynamic
+let clipHi = 0;
+
+function drawClipping(cx, cy, cw, ch, rot, hi){
+  ctx.save();
+  ctx.translate(cx+cw/2, cy+ch/2);
+  ctx.rotate(rot);
+  ctx.fillStyle='#f2e6c8';
+  ctx.fillRect(-cw/2,-ch/2,cw,ch);
+  ctx.strokeStyle='rgba(0,0,0,0.4)';ctx.lineWidth=1;
+  ctx.strokeRect(-cw/2,-ch/2,cw,ch);
+  ctx.fillStyle='#cc2200';
+  ctx.fillRect(-cw/2,-ch/2,cw,6);
+  ctx.fillStyle='#fff';
+  ctx.font='bold 5px sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText(t('clipHeadlines')[(hi||0)%t('clipHeadlines').length], 0, -ch/2+5);
+  ctx.fillStyle='rgba(0,0,0,0.3)';
+  for(var l=9;l<ch-1;l+=4){
+    var lw=(l%8===1)?cw*0.8:cw*0.6;
+    ctx.fillRect(-lw/2, l-ch/2, lw, 1.5);
+  }
+  ctx.restore();
+}
+
+var CLIPPINGS = [
+  [2,  8,  46, 18, -0.05],[3,  28, 42, 14,  0.04],[1,  45, 48, 16, -0.03],
+  [4,  63, 40, 12,  0.06],[2,  80, 44, 18, -0.04],[3, 100, 42, 14,  0.03],
+  [1, 118, 46, 16, -0.06],[4, 136, 38, 12,  0.05],[2, 154, 44, 18, -0.03],
+  [3, 172, 42, 14,  0.04]
+];
+
+function drawNewspaperClippings(x, y1, h1, y2, h2){
+  var hi=0;
+  for(var ci=0;ci<CLIPPINGS.length;ci++){
+    var c=CLIPPINGS[ci];
+    var rx=c[0],ry=c[1],cw=c[2],ch=c[3],rot=c[4];
+    if(ry+ch < h1){ drawClipping(x+rx, ry, cw, ch, rot, hi); hi++; }
+  }
+  for(var ci2=0;ci2<CLIPPINGS.length;ci2++){
+    var c2=CLIPPINGS[ci2];
+    var rx2=c2[0],ry2=c2[1],cw2=c2[2],ch2=c2[3],rot2=c2[4];
+    if(y2+ry2+ch2 < y2+h2){ drawClipping(x+rx2, y2+ry2, cw2, ch2, rot2, hi); hi++; }
+  }
+  // No ctx.restore here - each drawClipping handles its own save/restore
+}
+
+function drawGavel(cx, cy){
+  ctx.save(); ctx.translate(cx, cy);
+  // Background circle for contrast
+  ctx.fillStyle='rgba(255,220,50,0.92)';
+  ctx.beginPath(); ctx.arc(0,0,11,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(0,0,11,0,Math.PI*2); ctx.stroke();
+  // Handle
+  ctx.strokeStyle='#5a3010'; ctx.lineWidth=4; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(-7,7); ctx.lineTo(5,-5); ctx.stroke();
+  // Gavel head (horizontal rectangle, rotated)
+  ctx.save(); ctx.translate(4,-4); ctx.rotate(-0.7);
+  ctx.fillStyle='#3a2008';
+  ctx.fillRect(-3,-7,7,14);
+  ctx.fillStyle='#6a4020';
+  ctx.fillRect(-3,-7,7,5);
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawPipe(p){
+  var cfg=getCfg(),x=p.x,topH=p.topH,gap=p.gap||cfg.gap,botY=topH+gap,botH=H-botY;
+
+  // Base pipe (dark for all)
+  let grad=ctx.createLinearGradient(x,0,x+PIPE_W,0);
+  grad.addColorStop(0,'#2a2018');grad.addColorStop(0.4,'#4a3828');
+  grad.addColorStop(0.7,'#3a2a18');grad.addColorStop(1,'#1a1008');
+  ctx.fillStyle=grad;
+  roundRect(ctx,x+4,0,PIPE_W-8,topH-16,3);ctx.fill();
+  roundRect(ctx,x,topH-26,PIPE_W,26,5);ctx.fill();
+  roundRect(ctx,x+4,botY+16,PIPE_W-8,botH,3);ctx.fill();
+  roundRect(ctx,x,botY,PIPE_W,26,5);ctx.fill();
+
+  // Dark lines on normal pipes
+  if(!p.newspaper){
+    ctx.strokeStyle='rgba(255,255,200,0.14)';ctx.lineWidth=1;
+    for(let yy=10;yy<topH-26;yy+=8){ctx.beginPath();ctx.moveTo(x+8,yy);ctx.lineTo(x+PIPE_W-8,yy);ctx.stroke();}
+    for(let yy=botY+26;yy<H-40;yy+=8){ctx.beginPath();ctx.moveTo(x+8,yy);ctx.lineTo(x+PIPE_W-8,yy);ctx.stroke();}
+  }
+
+  // Newspaper clippings stuck on pipe
+  if(p.newspaper){
+    drawNewspaperClippings(x+4, 0, topH-16, botY+16, botH);
+  }
+
+  // Label on cap
+  ctx.fillStyle='#ffdd00';
+  ctx.font='bold 6px sans-serif';ctx.textAlign='center';
+  ctx.fillText(p.label,x+PIPE_W/2,topH-11);
+  ctx.fillText(p.label,x+PIPE_W/2,botY+16);
+  ctx.textAlign='left';
+
+  // Approck sits at bottom of top pipe (head peeking out)
+  if(p.hasApprock){
+    drawApprockOnPipe(x+PIPE_W/2, topH-2);
+  }
+}
+
+// ── PARTICLES ──────────────────────────────────────────────────────────────
+function spawnParticles(x,y,color){
+  for(let i=0;i<14;i++){
+    let a=(i/14)*Math.PI*2,sp=2+Math.random()*4;
+    particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:1,color,r:2+Math.random()*3});
+  }
+}
+function updateParticles(){
+  particles=particles.filter(p=>p.life>0);
+  particles.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;p.vy+=.15;p.life-=.04;
+    ctx.globalAlpha=p.life;ctx.fillStyle=p.color;
+    ctx.fillRect(p.x-p.r/2,p.y-p.r/2,p.r,p.r);
+  });
+  ctx.globalAlpha=1;
+}
+function updateScorePopups(){
+  scorePopups=scorePopups.filter(p=>p.life>0);
+  scorePopups.forEach(p=>{
+    p.y+=p.vy;p.life-=.03;
+    ctx.globalAlpha=p.life;ctx.fillStyle='#ffdd00';
+    ctx.font='10px serif';ctx.textAlign='center';ctx.fillText('+1',p.x,p.y);
+  });
+  ctx.globalAlpha=1;ctx.textAlign='left';
+}
+
+// ── COLLISION ──────────────────────────────────────────────────────────────
+function checkCollision(){
+  let cfg=getCfg(),bx=bird.x,by=bird.y,br=bird.r-4;
+  if(by+br>=H-20||by-br<=0)return true;  // floor at very bottom
+  for(var pi=0;pi<pipes.length;pi++){
+    var p=pipes[pi];
+    if(bx+br>p.x+4&&bx-br<p.x+PIPE_W-4){
+      if(by-br<p.topH||by+br>p.topH+(p.gap||cfg.gap))return true;
+    }
+  }
+  return false;
+}
+
+// ── FLOW HELPERS ───────────────────────────────────────────────────────────
+function startLevel(){
+  initGame();
+  state='playing';
+  bird.vy = -3.5;
+  setTimeout(function(){ if(state==='playing') bird.vy = Math.max(bird.vy, 0); }, 500);
+  newsOverlay.classList.add('hidden');
+  skandalPanel.classList.add('hidden');
+}
+
+function goToGolf(){
+  skandalPanel.classList.add('hidden');
+  state='golf';
+  golfFrame=0; golfBallActive=false; golfMissed=0;
+  golfPower=0; golfCharging=false;
+  powerBar.style.width='0%';
+  golfMsg.textContent=t('golfRelax');
+  golfUI.style.display='flex';
+}
+
+var _skandalShownAt=0;
+function showSkandalAbgewendet(){
+  var d=getLevelData();
+  document.getElementById('counterHeadline').textContent=d.counter.headline;
+  document.getElementById('counterBody').textContent=d.counter.body;
+  document.getElementById('counterSub').textContent=d.counter.sub||'';
+  skandalPanel.classList.remove('hidden');
+  _skandalShownAt=performance.now();
+}
+
+document.getElementById('skandalContinueBtn').addEventListener('click', function(){
+  // Enforce minimum 2 seconds display time
+  var elapsed=performance.now()-_skandalShownAt;
+  if(elapsed>=2000){ goToGolf(); }
+  else { setTimeout(goToGolf, 2000-elapsed); }
+});
+
+function _doShowNews(){
+  var d=getLevelData();
+  if(!d || !shuffledScandals.length){
+    gameoverPanel.classList.remove('hidden');
+    document.getElementById('goScore').innerHTML=t('allLevelsDone');
+    return;
+  }
+  showNewsCard(d.scandal, startLevel);
+}
+
+function showNextLevelNews(){
+  state='transitioning';
+  golfUI.style.display='none';
+  level++;
+  setTimeout(_doShowNews, 80);
+}
+
+// ── RED CAP TARGET ──────────────────────────────────────────────────────────
+var capActive=false, capX=0, capY=0, capPipe=null;
+var pipeSpawnCount=0;
+var lastPipeTime=0;
+
+function drawRedCap(x, y){
+  ctx.save(); ctx.translate(x, y);
+  var pulse=0.3+0.2*Math.abs(Math.sin(frame*0.08));
+  ctx.fillStyle='rgba(200,0,0,'+pulse+')';
+  ctx.beginPath(); ctx.arc(0,0,34,0,Math.PI*2); ctx.fill();
+  // Cap dome (realistic baseball cap shape)
+  ctx.fillStyle='#cc0000';
+  ctx.beginPath();
+  ctx.moveTo(-20,4);
+  ctx.bezierCurveTo(-22,-18,-8,-28,8,-28);
+  ctx.bezierCurveTo(22,-28,26,-16,24,4);
+  ctx.closePath(); ctx.fill();
+  // Panel seam
+  ctx.strokeStyle='#aa0000'; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.moveTo(8,-28); ctx.lineTo(6,4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-6,-26); ctx.lineTo(-8,4); ctx.stroke();
+  // Button on top
+  ctx.fillStyle='#880000';
+  ctx.beginPath(); ctx.arc(8,-28,3,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#ff5555';
+  ctx.beginPath(); ctx.arc(8,-28,1.5,0,Math.PI*2); ctx.fill();
+  // Sweatband base
+  ctx.fillStyle='#880000';
+  ctx.fillRect(-20,3,44,5);
+  // Long flat brim facing right
+  ctx.fillStyle='#cc0000';
+  ctx.beginPath();
+  ctx.moveTo(20,4); ctx.lineTo(50,5); ctx.lineTo(50,9);
+  ctx.bezierCurveTo(38,12,24,11,18,8);
+  ctx.closePath(); ctx.fill();
+  // Brim underside dark
+  ctx.fillStyle='#660000';
+  ctx.beginPath();
+  ctx.moveTo(22,5); ctx.lineTo(50,5); ctx.lineTo(50,7); ctx.lineTo(22,7);
+  ctx.closePath(); ctx.fill();
+  // Brim stitching
+  ctx.strokeStyle='#aa0000'; ctx.lineWidth=0.8;
+  ctx.beginPath(); ctx.moveTo(22,6); ctx.lineTo(49,6.5); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(21,7.5); ctx.lineTo(48,8); ctx.stroke();
+  // ZIEL label
+  ctx.fillStyle='#FFD700'; ctx.font='bold 8px sans-serif'; ctx.textAlign='center';
+  ctx.fillText(t('capLabel'), 2, 1);
+  ctx.restore();
+}
+var _lastTime=0;
+var _dt=1;
+var _frameAccum=0; // accumulate fractional frames
+
+function loop(now){
+  if(_lastTime>0) _dt=Math.min((now-_lastTime)/16.667, 2.5);
+  else _dt=1;
+  _lastTime=now;
+  // Increment frame at 60fps equivalent rate
+  _frameAccum+=_dt;
+  if(_frameAccum>=1){ frame++; _frameAccum-=1; }
+
+  if(state==='golf'||state==='transitioning'){
+    if(state==='golf'){
+      golfFrame++;
+      drawGolfScene(golfFrame);
+      updatePowerBar();
+      if(golfFrame>=480){ showNextLevelNews(); }
+    } else {
+      // transitioning: just black so news card shows cleanly on top
+      ctx.fillStyle='#000';
+      ctx.fillRect(0,0,W,H);
+    }
+    updateParticles();
+    requestAnimationFrame(loop);return;
+  }
+
+  drawWhiteHouseBackground();
+
+  if(state==='playing'){
+    let cfg=getCfg();
+    elapsed=(performance.now()-startTime)/1000;
+    // Timer hidden from player - they don't know how long left
+    timerEl.textContent='';
+
+    bird.vy += cfg.gravity * _dt;
+    bird.y  += bird.vy * _dt;
+    // Clamp so bird can't fly above screen immediately
+    if(bird.y < bird.r) { bird.y = bird.r; bird.vy = 0; }
+
+    // Time-based pipe spawning - always consistent regardless of framerate
+    var pipeIntervalMs = cfg.pipeInterval * 16.667;
+    // Don't spawn until 1.5s in, and enforce minimum interval
+    if(elapsed > 1.5 && elapsed*1000 - lastPipeTime >= pipeIntervalMs){
+      // Also check last pipe isn't still too close to right edge
+      var lastPipe = pipes[pipes.length-1];
+      if(!lastPipe || lastPipe.x < W - 80){
+        spawnPipe();
+        lastPipeTime = elapsed*1000;
+      }
+    }
+    pipes.forEach(p=>p.x-=cfg.pipeSpeed*_dt);
+    pipes=pipes.filter(p=>p.x>-PIPE_W-10);
+
+    pipes.forEach(p=>{
+      if(!p.passed&&p.x+PIPE_W<bird.x){
+        p.passed=true; score++; totalScore++;
+        scorEl.textContent=t('scoreLabel')+totalScore;
+        scorePopups.push({x:bird.x+20,y:bird.y-30,life:1,vy:-2});
+        spawnParticles(bird.x+20,bird.y,'#FFD700');
+        playScore();
+      }
+    });
+
+    // Approck: no longer follows - appears on pipes (handled in drawPipe)
+    villain.bobPhase+=.04;
+
+    if(elapsed>=LEVEL1_TIME && !capActive){
+      capActive=true;
+      // Don't spawn extra pipe - next regular pipe will get the cap (see spawnPipe)
+    }
+
+    // Cap tracks whichever pipe was marked as capPipe
+    if(capActive && capPipe){
+      capX = capPipe.x + PIPE_W/2;
+      var capGap = capPipe.gap || getCfg().gap;
+      capY = capPipe.topH + capGap/2;
+      // Check if Drumply reaches the cap
+      var cdx=bird.x-capX, cdy=bird.y-capY;
+      if(Math.sqrt(cdx*cdx+cdy*cdy)<28){
+        capActive=false;
+        state='skandal';
+        timerEl.textContent='';
+        playWin();
+        spawnParticles(bird.x, bird.y, '#cc0000');
+        spawnParticles(bird.x, bird.y, '#FFD700');
+        showSkandalAbgewendet();
+      }
+    }
+
+    if(checkCollision()){
+      spawnParticles(bird.x,bird.y,'#ff4400');
+      playCrash();
+      state='gameover';
+      timerEl.textContent='';
+      doSprintApprock(bird.x, bird.y);
+      saveHighscore();
+    }
+  }
+
+  pipes.forEach(drawPipe);
+  if(capActive && capPipe && capX > PIPE_W){
+    drawRedCap(capX, capY);
+    // If cap is still off-screen right, show arrow hint
+    if(capX > W-20){
+      ctx.fillStyle='rgba(255,80,0,0.8)';
+      ctx.font='bold 14px sans-serif';
+      ctx.textAlign='right';
+      ctx.fillText(t('capHint'), W-6, H/2);
+      ctx.textAlign='left';
+    }
+  }
+  // Only show standalone Approck during gameover sprint animation
+  if(state==='gameover') drawApprock(villain.x,villain.y);
+  if(state!=='gameover')drawDrumply(bird.x,bird.y);
+  updateParticles();
+  updateScorePopups();
+
+  requestAnimationFrame(loop);
+}
+
+// ── JUMP ───────────────────────────────────────────────────────────────────
+function jump(){
+  if(state==='playing'){ bird.vy=getCfg().jumpForce; resumeAudio(); playFlap(); }
+}
+canvas.addEventListener('click', function(){ resumeAudio(); jump(); });
+document.addEventListener('keydown',e=>{ if(e.code==='Space'){e.preventDefault();jump();} });
+
+document.getElementById('golfContinueBtn').addEventListener('click', ()=>{
+  if(state==='golf') showNextLevelNews();
+});
+
+// ── GAMEOVER PANEL ─────────────────────────────────────────────────────────
+gameoverPanel.addEventListener('click',()=>{
+  gameoverPanel.classList.add('hidden');
+  level=0; totalScore=0;
+  initGame(); initLevelPools();
+  bird.y=H/2;
+  updateHighscoreDisplay();
+  // Show intro again
+  introPanel.classList.remove('hidden');
+  introPanel.addEventListener('click',function(){
+    unlockAudio();
+    introPanel.classList.add('hidden');
+    var d=getLevelData();
+    showNewsCard(d.scandal, startLevel);
+  },{once:true});
+});
+
+// ── BOOT ───────────────────────────────────────────────────────────────────
+initGame();
+initLevelPools();
+bird.y = H/2;
+applyTranslations();
+updateHighscoreDisplay();
+
+// Show intro backstory first
+introPanel.classList.remove('hidden');
+introPanel.addEventListener('click', function(){
+  unlockAudio();
+  introPanel.classList.add('hidden');
+  var d=getLevelData();
+  showNewsCard(d.scandal, startLevel);
+}, {once:true});
+
+loop();
+</script>
+
+</body>
+</html>

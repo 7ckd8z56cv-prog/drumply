@@ -143,6 +143,10 @@ letter-spacing:4px;margin-top:8px;text-shadow:0 0 6px #cc000088;
   </div>
 
   <div class="introCta" style="color:#ffdd00;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:3px;animation:blink 1s infinite;margin-top:12px;">▶ PRESS TO START</div>
+  <div style="margin-top:10px;text-align:center;font-family:'Special Elite',cursive;font-size:10px;color:rgba(255,255,255,0.4);line-height:1.7;">
+    <span id="shareBoxText">🎮 Share with friends:</span><br>
+    <span style="color:rgba(255,117,24,0.7);font-family:'Bebas Neue',sans-serif;font-size:11px;letter-spacing:1px;">7ckd8z56cv-prog.github.io/drumply</span>
+  </div>
 </div>
 
 <!-- TV News overlay (scandal before each level) -->
@@ -297,6 +301,9 @@ var T = {
     golfNewsSoon: 'New report in ',
     golfNewsNow: 'BREAKING NEWS INCOMING...',
     newsStart: 'TAP TO START',
+    tapHint: '👆 TAP TO FLY',
+    shareText: 'I reached Level {L} in Drumply – the political satire game! Can you beat me? 🎮👆',
+    shareBox: '🎮 Help Drumply escape! Share the link with your friends:',
     mission: 'MISSION: Drumply needs the red cap – only then can he plan his next distraction. He sets out.',
     capHint: 'CAP >',
     clipHeadlines: ['MEDIA','NEWSPAPER','PRESS','SCANDAL!','BREAKING','EXCLUSIVE'],
@@ -358,6 +365,9 @@ var T = {
     golfNewsSoon: 'Neue Meldung in ',
     golfNewsNow: 'BREAKING NEWS INCOMING...',
     newsStart: 'TIPPEN ZUM STARTEN',
+    tapHint: '👆 TIPPEN ZUM FLIEGEN',
+    shareText: 'Ich habe Level {L} in Drumply erreicht – das politische Satirespiel! Schaffst du mehr? 🎮👆',
+    shareBox: '🎮 Hilf Drumply zu fliehen! Teile den Link mit deinen Freunden:',
     mission: 'MISSION: Drumply braucht die rote Cap – nur mit ihr kann er sein naechstes Ablenkungsmanöver starten. Er zieht los.',
     capHint: 'CAP >',
     clipHeadlines: ['MEDIEN','ZEITUNG','PRESSE','SKANDAL!','BREAKING','EXKLUSIV'],
@@ -419,6 +429,9 @@ var T = {
     golfNewsSoon: 'Nouveau rapport dans ',
     golfNewsNow: 'BREAKING NEWS...',
     newsStart: 'APPUYER POUR COMMENCER',
+    tapHint: '👆 APPUYER POUR VOLER',
+    shareText: 'J\'ai atteint le Niveau {L} dans Drumply – le jeu de satire politique! Peux-tu faire mieux? 🎮👆',
+    shareBox: '🎮 Aide Drumply à s\'échapper! Partage le lien avec tes amis:',
     mission: 'MISSION: Drumply a besoin de la casquette rouge – c\'est le seul moyen de lancer sa prochaine manoeuvre de diversion. Il part a sa recherche.',
     capHint: 'CAP >',
     clipHeadlines: ['MEDIAS','JOURNAL','PRESSE','SCANDALE!','BREAKING','EXCLUSIF'],
@@ -498,6 +511,7 @@ function applyTranslations(){
   document.getElementById('titleLabel').textContent=t('titleSub');
   var ts2=document.getElementById('titleSub2');
   if(ts2) ts2.textContent=lang==='de'?'POLITISCHE SATIRE':lang==='fr'?'SATIRE POLITIQUE':'POLITICAL SATIRE';
+  var sbEl=document.getElementById('shareBoxText'); if(sbEl) sbEl.textContent=t('shareBox');
   updateHighscoreDisplay();
 }
 
@@ -527,12 +541,119 @@ const LEVEL_CFG = [
 ];
 function getCfg(){ return LEVEL_CFG[Math.min(level, LEVEL_CFG.length-1)]; }
 
-// ── SOUND (stubs - audio requires webserver, not local file) ───────────────
-function unlockAudio(){}
-function resumeAudio(){}
-function playFlap(){}
-function playScore(){}
-function playCrash(){}
+// ── SOUND SYSTEM ───────────────────────────────────────────────────────────
+var _AC=null, _audioUnlocked=false;
+
+function unlockAudio(){
+  if(_audioUnlocked)return;
+  try{
+    if(!_AC) _AC=new(window.AudioContext||window.webkitAudioContext)();
+    // Play silent buffer to unlock iOS
+    var buf=_AC.createBuffer(1,1,22050);
+    var src=_AC.createBufferSource();
+    src.buffer=buf; src.connect(_AC.destination); src.start(0);
+    _AC.resume();
+    _audioUnlocked=true;
+  }catch(e){_AC=null;}
+}
+
+function resumeAudio(){
+  unlockAudio();
+  if(_AC&&_AC.state==='suspended')_AC.resume();
+}
+
+function _ac(){
+  if(!_AC) unlockAudio();
+  if(_AC&&_AC.state==='suspended')_AC.resume();
+  return _AC;
+}
+
+function playFlap(){
+  var ctx=_ac(); if(!ctx)return;
+  var o=ctx.createOscillator();
+  var g=ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.type='sine';
+  o.frequency.setValueAtTime(380,ctx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(220,ctx.currentTime+0.07);
+  g.gain.setValueAtTime(0.04,ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.08);
+  o.start(ctx.currentTime); o.stop(ctx.currentTime+0.09);
+}
+
+function playScore(){
+  var ctx=_ac(); if(!ctx)return;
+  var o=ctx.createOscillator();
+  var g=ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.type='triangle';
+  o.frequency.setValueAtTime(880,ctx.currentTime);
+  o.frequency.setValueAtTime(1100,ctx.currentTime+0.04);
+  g.gain.setValueAtTime(0.03,ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.12);
+  o.start(ctx.currentTime); o.stop(ctx.currentTime+0.13);
+}
+
+function playCrash(){
+  var ctx=_ac(); if(!ctx)return;
+  var buf=ctx.createBuffer(1,ctx.sampleRate*0.25,ctx.sampleRate);
+  var data=buf.getChannelData(0);
+  for(var i=0;i<data.length;i++) data[i]=(Math.random()*2-1)*Math.pow(1-i/data.length,1.5);
+  var src=ctx.createBufferSource();
+  var g=ctx.createGain();
+  src.buffer=buf; src.connect(g); g.connect(ctx.destination);
+  g.gain.setValueAtTime(0.3,ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.25);
+  src.start(ctx.currentTime);
+}
+
+function playNewspaper(){
+  var ctx=_ac(); if(!ctx)return;
+  var buf=ctx.createBuffer(1,ctx.sampleRate*0.12,ctx.sampleRate);
+  var data=buf.getChannelData(0);
+  for(var i=0;i<data.length;i++){
+    var env=Math.pow(1-i/data.length,2);
+    data[i]=(Math.random()*2-1)*env*0.4;
+  }
+  var src=ctx.createBufferSource();
+  var g=ctx.createGain();
+  // High-pass filter for paper rustle
+  var f=ctx.createBiquadFilter();
+  f.type='highpass'; f.frequency.value=2000;
+  src.buffer=buf; src.connect(f); f.connect(g); g.connect(ctx.destination);
+  g.gain.setValueAtTime(0.08,ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.12);
+  src.start(ctx.currentTime);
+}
+
+function playGolfSwing(){
+  var ctx=_ac(); if(!ctx)return;
+  // Swoosh
+  var buf=ctx.createBuffer(1,ctx.sampleRate*0.15,ctx.sampleRate);
+  var data=buf.getChannelData(0);
+  for(var i=0;i<data.length;i++){
+    var env=Math.sin(Math.PI*i/data.length);
+    data[i]=(Math.random()*2-1)*env;
+  }
+  var src=ctx.createBufferSource();
+  var g=ctx.createGain();
+  var f=ctx.createBiquadFilter();
+  f.type='bandpass'; f.frequency.value=800; f.Q.value=0.5;
+  src.buffer=buf; src.connect(f); f.connect(g); g.connect(ctx.destination);
+  g.gain.setValueAtTime(0.18,ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.15);
+  src.start(ctx.currentTime);
+  // Impact click
+  var o=ctx.createOscillator();
+  var g2=ctx.createGain();
+  o.connect(g2); g2.connect(ctx.destination);
+  o.type='sine'; o.frequency.setValueAtTime(200,ctx.currentTime+0.1);
+  o.frequency.exponentialRampToValueAtTime(60,ctx.currentTime+0.18);
+  g2.gain.setValueAtTime(0.15,ctx.currentTime+0.1);
+  g2.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.2);
+  o.start(ctx.currentTime+0.1); o.stop(ctx.currentTime+0.21);
+}
+
 function playWin(){}
 const PIPE_W=52;
 let LEVEL1_TIME=45;
@@ -596,13 +717,9 @@ let totalScore=0; // persists across levels
 function updateHighscoreDisplay(){
   try {
     var personal=parseInt(localStorage.getItem('drumply_hs')||'0');
-    var global=parseInt(localStorage.getItem('drumply_hs_global')||'0');
     var el=document.getElementById('highscoreDisplay');
     if(!el) return;
-    var out=[];
-    if(global>0)   out.push(t('hsGlobal')+global);
-    if(personal>0) out.push(t('hsPersonal')+personal);
-    el.innerHTML=out.join('<br>');
+    el.innerHTML=personal>0 ? t('hsPersonal')+personal : '';
   } catch(e) {}
 }
 
@@ -610,8 +727,6 @@ function saveHighscore(){
   try {
     var personal=parseInt(localStorage.getItem('drumply_hs')||'0');
     if(totalScore>personal) localStorage.setItem('drumply_hs',totalScore);
-    var global=parseInt(localStorage.getItem('drumply_hs_global')||'0');
-    if(totalScore>global) localStorage.setItem('drumply_hs_global',totalScore);
   } catch(e) {}
 }
 
@@ -1014,6 +1129,7 @@ function golfPressStart_fn(){
   golfBtn.innerHTML=t('golfRelease');
 }
 function golfPressEnd_fn(){
+  unlockAudio(); resumeAudio();
   if(!golfCharging||state!=='golf')return;
   golfCharging=false;
   let held=Math.min((performance.now()-golfPressStart)/1200,1);
@@ -1037,6 +1153,7 @@ function updatePowerBar(){
 
 function golfFire(power){
   if(golfBallActive)return;
+  playGolfSwing();
   golfBallActive=true;
   let dX=115, dY=H*0.565;
   golfBallX=dX+45; golfBallY=dY+62;
@@ -1169,6 +1286,7 @@ function drawPipe(p){
 
   // Newspaper clippings stuck on pipe
   if(p.newspaper){
+    if(p.x<=360+52 && !p._paperSoundPlayed){ p._paperSoundPlayed=true; playNewspaper(); }
     drawNewspaperClippings(x+4, 0, topH-16, botY+16, botH);
   }
 
@@ -1225,9 +1343,12 @@ function checkCollision(){
 }
 
 // ── FLOW HELPERS ───────────────────────────────────────────────────────────
+var _showTapHint=false;
 function startLevel(){
   initGame();
   state='playing';
+  _showTapHint=true;
+  setTimeout(function(){ _showTapHint=false; }, 2500);
   bird.vy = -3.5;
   setTimeout(function(){ if(state==='playing') bird.vy = Math.max(bird.vy, 0); }, 500);
   newsOverlay.classList.add('hidden');
@@ -1442,6 +1563,23 @@ function loop(now){
   // Only show standalone Approck during gameover sprint animation
   if(state==='gameover') drawApprock(villain.x,villain.y);
   if(state!=='gameover')drawDrumply(bird.x,bird.y);
+
+  // Tap hint - shown for 2.5s at level start
+  if(_showTapHint && state==='playing'){
+    ctx.save();
+    ctx.globalAlpha=0.75;
+    ctx.fillStyle='rgba(0,0,0,0.5)';
+    roundRect(ctx,W/2-70,H/2+40,140,28,6);ctx.fill();
+    ctx.fillStyle='#ffdd00';
+    ctx.font='bold 13px "Bebas Neue",sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(t('tapHint'),W/2,H/2+59);
+    ctx.textAlign='left';
+    ctx.restore();
+  }
+
+  // Weather effects from level 3+
+  drawWeather();
   updateParticles();
   updateScorePopups();
 
@@ -1476,6 +1614,66 @@ gameoverPanel.addEventListener('click',()=>{
   },{once:true});
 });
 
+// ── WEATHER ────────────────────────────────────────────────────────────────
+var _rainDrops=[];
+var _lightning=0;
+
+function initWeather(){
+  _rainDrops=[];
+  for(var i=0;i<60;i++){
+    _rainDrops.push({x:Math.random()*W, y:Math.random()*H, speed:4+Math.random()*4, len:8+Math.random()*8});
+  }
+}
+initWeather();
+
+function drawWeather(){
+  if(level<2) return; // starts at level 3 (index 2)
+  var intensity=Math.min((level-2)/4, 1); // 0 at level3, 1 at level6+
+
+  // Rain
+  ctx.save();
+  ctx.strokeStyle='rgba(180,210,255,'+(0.2+intensity*0.25)+')';
+  ctx.lineWidth=1;
+  for(var i=0;i<_rainDrops.length;i++){
+    var d=_rainDrops[i];
+    d.y+=d.speed*_dt;
+    d.x+=d.speed*0.3*_dt;
+    if(d.y>H){ d.y=-10; d.x=Math.random()*W; }
+    if(d.x>W){ d.x=0; }
+    ctx.beginPath();
+    ctx.moveTo(d.x,d.y);
+    ctx.lineTo(d.x+d.len*0.3,d.y+d.len);
+    ctx.stroke();
+  }
+
+  // Lightning flash at level 5+
+  if(level>=4 && Math.random()<0.003){
+    _lightning=6;
+  }
+  if(_lightning>0){
+    ctx.fillStyle='rgba(255,255,255,'+(_lightning*0.04)+')';
+    ctx.fillRect(0,0,W,H);
+    _lightning--;
+  }
+  ctx.restore();
+}
+
+// ── SHARE ──────────────────────────────────────────────────────────────────
+function shareScore(){
+  var shareLink='https://7ckd8z56cv-prog.github.io/drumply';
+  var text=t('shareText').replace('{L}', level+1)+'\n'+shareLink;
+  if(navigator.share){
+    navigator.share({title:'Drumply', text:text, url:shareLink});
+  } else {
+    // Fallback: copy to clipboard
+    try{
+      navigator.clipboard.writeText(text);
+      var btn=document.getElementById('shareBtn');
+      if(btn){ btn.textContent='✅ COPIED!'; setTimeout(function(){btn.textContent='📤 SHARE SCORE';},2000); }
+    }catch(e){}
+  }
+}
+
 // ── BOOT ───────────────────────────────────────────────────────────────────
 initGame();
 initLevelPools();
@@ -1486,7 +1684,7 @@ updateHighscoreDisplay();
 // Show intro backstory first
 introPanel.classList.remove('hidden');
 introPanel.addEventListener('click', function(){
-  unlockAudio();
+  unlockAudio(); resumeAudio();
   introPanel.classList.add('hidden');
   var d=getLevelData();
   showNewsCard(d.scandal, startLevel);
